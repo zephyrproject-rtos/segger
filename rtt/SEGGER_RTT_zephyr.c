@@ -21,7 +21,7 @@
 
 K_MUTEX_DEFINE(rtt_term_mutex);
 
-static int rtt_init(struct device *unused)
+static int rtt_init(const struct device *unused)
 {
 	ARG_UNUSED(unused);
 
