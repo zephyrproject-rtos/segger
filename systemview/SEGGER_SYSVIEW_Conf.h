@@ -10,6 +10,7 @@ uint32_t sysview_get_timestamp(void);
 uint32_t sysview_get_interrupt(void);
 
 #define SEGGER_SYSVIEW_RTT_BUFFER_SIZE CONFIG_SEGGER_SYSVIEW_RTT_BUFFER_SIZE
+#define SEGGER_SYSVIEW_POST_MORTEM_MODE CONFIG_SEGGER_SYSVIEW_POST_MORTEM_MODE
 
 // Lock SystemView (nestable)
 #define SEGGER_SYSVIEW_LOCK()	{					       \
