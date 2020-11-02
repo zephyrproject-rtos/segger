@@ -91,6 +91,10 @@ Revision: $Rev: 13430 $
 
 #define USE_RTT_ASM                               (0) // Use assembler version of SEGGER_RTT.c when 1
 
+#if defined(CONFIG_SEGGER_RTT_SECTION_DTCM)
+#define SEGGER_RTT_SECTION                        ".dtcm_data"
+#endif
+
 /*********************************************************************
 *
 *       RTT memcpy configuration
