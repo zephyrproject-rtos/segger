@@ -1,2 +1,3 @@
+name: segger
 build:
-  cmake: .
+  cmake-ext: True
