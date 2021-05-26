@@ -158,9 +158,16 @@ Revision: $Rev: 21386 $
 #if ((defined(__SES_ARM) || defined(__SES_RISCV) || defined(__CROSSWORKS_ARM) || defined(__GNUC__) || defined(__clang__)) && !defined (__CC_ARM) && !defined(WIN32))
   #if defined(__ZEPHYR__) && defined (CONFIG_SEGGER_RTT_CUSTOM_LOCKING)
     #include <kernel.h>
-    extern struct k_mutex rtt_term_mutex;
-    #define SEGGER_RTT_LOCK() k_mutex_lock(&rtt_term_mutex, K_FOREVER);
-    #define SEGGER_RTT_UNLOCK() k_mutex_unlock(&rtt_term_mutex);
+    #ifdef CONFIG_MULTITHREADING
+      extern struct k_mutex rtt_term_mutex;
+      #define SEGGER_RTT_LOCK() k_mutex_lock(&rtt_term_mutex, K_FOREVER);
+      #define SEGGER_RTT_UNLOCK() k_mutex_unlock(&rtt_term_mutex);
+    #else
+      #define SEGGER_RTT_LOCK() { \
+        unsigned int key = irq_lock()
+      #define SEGGER_RTT_UNLOCK() irq_unlock(key); \
+        }
+    #endif
     #define RTT_USE_ASM 0
   #elif (defined(__ARM_ARCH_6M__) || defined(__ARM_ARCH_8M_BASE__))
     #define SEGGER_RTT_LOCK()   {                                                                   \
