@@ -78,33 +78,21 @@ Revision: $Rev: 21386 $
 // Up-channel 0: RTT
 // Up-channel 1: SystemView
 //
-#ifndef   SEGGER_RTT_MAX_NUM_UP_BUFFERS
-  #define SEGGER_RTT_MAX_NUM_UP_BUFFERS             (3)     // Max. number of up-buffers (T->H) available on this target    (Default: 3)
-#endif
+#define SEGGER_RTT_MAX_NUM_UP_BUFFERS             CONFIG_SEGGER_RTT_MAX_NUM_UP_BUFFERS     // Max. number of up-buffers (T->H) available on this target    (Default: 3)
 //
 // Most common case:
 // Down-channel 0: RTT
 // Down-channel 1: SystemView
 //
-#ifndef   SEGGER_RTT_MAX_NUM_DOWN_BUFFERS
-  #define SEGGER_RTT_MAX_NUM_DOWN_BUFFERS           (3)     // Max. number of down-buffers (H->T) available on this target  (Default: 3)
-#endif
+#define SEGGER_RTT_MAX_NUM_DOWN_BUFFERS           CONFIG_SEGGER_RTT_MAX_NUM_DOWN_BUFFERS   // Max. number of down-buffers (H->T) available on this target  (Default: 3)
 
-#ifndef   BUFFER_SIZE_UP
-  #define BUFFER_SIZE_UP                            (1024)  // Size of the buffer for terminal output of target, up to host (Default: 1k)
-#endif
+#define BUFFER_SIZE_UP                            CONFIG_SEGGER_RTT_BUFFER_SIZE_UP         // Size of the buffer for terminal output of target, up to host (Default: 1k)
 
-#ifndef   BUFFER_SIZE_DOWN
-  #define BUFFER_SIZE_DOWN                          (16)    // Size of the buffer for terminal input to target from host (Usually keyboard input) (Default: 16)
-#endif
+#define BUFFER_SIZE_DOWN                          CONFIG_SEGGER_RTT_BUFFER_SIZE_DOWN       // Size of the buffer for terminal input to target from host (Usually keyboard input) (Default: 16)
 
-#ifndef   SEGGER_RTT_PRINTF_BUFFER_SIZE
-  #define SEGGER_RTT_PRINTF_BUFFER_SIZE             (64u)    // Size of buffer for RTT printf to bulk-send chars via RTT     (Default: 64)
-#endif
+#define SEGGER_RTT_PRINTF_BUFFER_SIZE             CONFIG_SEGGER_RTT_PRINTF_BUFFER_SIZE     // Size of buffer for RTT printf to bulk-send chars via RTT     (Default: 64)
 
-#ifndef   SEGGER_RTT_MODE_DEFAULT
-  #define SEGGER_RTT_MODE_DEFAULT                   SEGGER_RTT_MODE_NO_BLOCK_SKIP // Mode for pre-initialized terminal channel (buffer 0)
-#endif
+#define SEGGER_RTT_MODE_DEFAULT                   CONFIG_SEGGER_RTT_MODE                   // Mode for pre-initialized terminal channel (buffer 0)
 
 #if defined(CONFIG_SEGGER_RTT_SECTION_DTCM)
 #define SEGGER_RTT_SECTION                        ".dtcm_data"
@@ -122,8 +110,10 @@ Revision: $Rev: 21386 $
 *       This is may be required with memory access restrictions,
 *       such as on Cortex-A devices with MMU.
 */
-#ifndef   SEGGER_RTT_MEMCPY_USE_BYTELOOP
-  #define SEGGER_RTT_MEMCPY_USE_BYTELOOP              0 // 0: Use memcpy/SEGGER_RTT_MEMCPY, 1: Use a simple byte-loop
+#if defined(CONFIG_SEGGER_RTT_MEMCPY_USE_BYTELOOP)
+#define SEGGER_RTT_MEMCPY_USE_BYTELOOP              1 // 1: Use a simple byte-loop
+#else
+#define SEGGER_RTT_MEMCPY_USE_BYTELOOP              0 // 0: Use memcpy/SEGGER_RTT_MEMCPY
 #endif
 //
 // Example definition of SEGGER_RTT_MEMCPY to external memcpy with GCC toolchains and Cortex-A targets
