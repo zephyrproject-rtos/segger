@@ -154,7 +154,7 @@ Revision: $Rev: 21386 $
       #define SEGGER_RTT_UNLOCK() k_mutex_unlock(&rtt_term_mutex);
     #else
       #define SEGGER_RTT_LOCK() { \
-        unsigned int key = irq_lock()
+        unsigned int key = irq_lock();
       #define SEGGER_RTT_UNLOCK() irq_unlock(key); \
         }
     #endif
