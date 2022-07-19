@@ -147,7 +147,7 @@ Revision: $Rev: 21386 $
 */
 #if ((defined(__SES_ARM) || defined(__SES_RISCV) || defined(__CROSSWORKS_ARM) || defined(__GNUC__) || defined(__clang__)) && !defined (__CC_ARM) && !defined(WIN32))
   #if defined(__ZEPHYR__) && defined (CONFIG_SEGGER_RTT_CUSTOM_LOCKING)
-    #include <kernel.h>
+    #include <zephyr/kernel.h>
     #ifdef CONFIG_MULTITHREADING
       extern struct k_mutex rtt_term_mutex;
       #define SEGGER_RTT_LOCK() k_mutex_lock(&rtt_term_mutex, K_FOREVER);
