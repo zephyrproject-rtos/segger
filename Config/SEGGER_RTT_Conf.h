@@ -147,15 +147,17 @@ Revision: $Rev: 21386 $
 */
 #if ((defined(__SES_ARM) || defined(__SES_RISCV) || defined(__CROSSWORKS_ARM) || defined(__GNUC__) || defined(__clang__)) && !defined (__CC_ARM) && !defined(WIN32))
   #if defined(__ZEPHYR__) && defined (CONFIG_SEGGER_RTT_CUSTOM_LOCKING)
-    #include <zephyr/kernel.h>
     #ifdef CONFIG_MULTITHREADING
-      extern struct k_mutex rtt_term_mutex;
-      #define SEGGER_RTT_LOCK() k_mutex_lock(&rtt_term_mutex, K_FOREVER);
-      #define SEGGER_RTT_UNLOCK() k_mutex_unlock(&rtt_term_mutex);
+      extern void zephyr_rtt_mutex_lock(void);
+      extern void zephyr_rtt_mutex_unlock(void);
+      #define SEGGER_RTT_LOCK() zephyr_rtt_mutex_lock()
+      #define SEGGER_RTT_UNLOCK() zephyr_rtt_mutex_unlock()
     #else
+      extern unsigned int zephyr_rtt_irq_lock(void);
+      extern void zephyr_rtt_irq_unlock(unsigned int key);
       #define SEGGER_RTT_LOCK() { \
-        unsigned int key = irq_lock()
-      #define SEGGER_RTT_UNLOCK() irq_unlock(key); \
+        unsigned int key = zephyr_rtt_irq_lock()
+      #define SEGGER_RTT_UNLOCK() zephyr_rtt_irq_unlock(key); \
         }
     #endif
     #define RTT_USE_ASM 0
