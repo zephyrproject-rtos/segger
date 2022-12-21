@@ -97,7 +97,6 @@ Purpose : Implementation of debug monitor for J-Link monitor mode debug on Corte
 **********************************************************************
 */
 
-
 /********************************************************************* 
 * 
 *       JLINK_MONITOR_OnExit()
@@ -127,8 +126,8 @@ void JLINK_MONITOR_OnExit(void) {
 *  Notes 
 *    (1) Must not keep the CPU busy for more than 100 ms
 */ 
-
 void JLINK_MONITOR_OnEnter(void) {
+  //
   // Add custom code here
   //
 //  BSP_SetLED(0);
@@ -145,8 +144,12 @@ void JLINK_MONITOR_OnEnter(void) {
 *  Notes 
 *    (1) Must not keep the CPU busy for more than 100 ms
 */
-
 void JLINK_MONITOR_OnPoll(void) {
+  //
+  // Add custom code here
+  //
+//  BSP_ToggleLED(0);
+//  _Delay(500000);
 }
 
 /****** End Of File *************************************************/
