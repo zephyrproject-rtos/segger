@@ -42,7 +42,7 @@
 *                                                                    *
 **********************************************************************
 *                                                                    *
-*       SystemView version: 3.30                                    *
+*       SystemView version: 3.40                                    *
 *                                                                    *
 **********************************************************************
 ---------------------------END-OF-HEADER------------------------------
@@ -50,7 +50,7 @@ File    : SEGGER_RTT_Conf.h
 Purpose : Implementation of SEGGER real-time transfer (RTT) which
           allows real-time communication on targets which support
           debugger memory accesses while the CPU is running.
-Revision: $Rev: 21386 $
+Revision: $Rev: 24316 $
 
 */
 
@@ -96,6 +96,8 @@ Revision: $Rev: 21386 $
 
 #if defined(CONFIG_SEGGER_RTT_SECTION_DTCM)
 #define SEGGER_RTT_SECTION                        ".dtcm_data"
+#elif defined(CONFIG_SEGGER_RTT_SECTION_CUSTOM)
+#define SEGGER_RTT_SECTION                        CONFIG_SEGGER_RTT_SECTION_CUSTOM_NAME
 #endif
 
 /*********************************************************************
@@ -113,7 +115,9 @@ Revision: $Rev: 21386 $
 #if defined(CONFIG_SEGGER_RTT_MEMCPY_USE_BYTELOOP)
 #define SEGGER_RTT_MEMCPY_USE_BYTELOOP              1 // 1: Use a simple byte-loop
 #else
+#ifndef   SEGGER_RTT_MEMCPY_USE_BYTELOOP
 #define SEGGER_RTT_MEMCPY_USE_BYTELOOP              0 // 0: Use memcpy/SEGGER_RTT_MEMCPY
+#endif
 #endif
 //
 // Example definition of SEGGER_RTT_MEMCPY to external memcpy with GCC toolchains and Cortex-A targets
@@ -156,11 +160,11 @@ Revision: $Rev: 21386 $
       extern unsigned int zephyr_rtt_irq_lock(void);
       extern void zephyr_rtt_irq_unlock(unsigned int key);
       #define SEGGER_RTT_LOCK() { \
-        unsigned int key = zephyr_rtt_irq_lock()
+	unsigned int key = zephyr_rtt_irq_lock()
       #define SEGGER_RTT_UNLOCK() zephyr_rtt_irq_unlock(key); \
         }
-    #endif
-    #define RTT_USE_ASM 0
+      #endif
+   #define RTT_USE_ASM 0
   #elif (defined(__ARM_ARCH_6M__) || defined(__ARM_ARCH_8M_BASE__))
     #define SEGGER_RTT_LOCK()   {                                                                   \
                                     unsigned int _SEGGER_RTT__LockState;                                         \
@@ -199,7 +203,7 @@ Revision: $Rev: 21386 $
                                                   );                                                \
                                 }
 
-  #elif defined(__ARM_ARCH_7A__)
+  #elif (defined(__ARM_ARCH_7A__) || defined(__ARM_ARCH_7R__))
     #define SEGGER_RTT_LOCK() {                                                \
                                  unsigned int _SEGGER_RTT__LockState;                       \
                                  __asm volatile ("mrs r1, CPSR \n\t"           \

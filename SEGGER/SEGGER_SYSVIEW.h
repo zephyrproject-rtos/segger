@@ -42,13 +42,13 @@
 *                                                                    *
 **********************************************************************
 *                                                                    *
-*       SystemView version: 3.30                                    *
+*       SystemView version: 3.40                                    *
 *                                                                    *
 **********************************************************************
 -------------------------- END-OF-HEADER -----------------------------
 File    : SEGGER_SYSVIEW.h
 Purpose : System visualization API.
-Revision: $Rev: 21292 $
+Revision: $Rev: 28237 $
 */
 
 #ifndef SEGGER_SYSVIEW_H
@@ -77,7 +77,7 @@ extern "C" {
 */
 
 #define SEGGER_SYSVIEW_MAJOR          3
-#define SEGGER_SYSVIEW_MINOR          10
+#define SEGGER_SYSVIEW_MINOR          32
 #define SEGGER_SYSVIEW_REV            0
 #define SEGGER_SYSVIEW_VERSION        ((SEGGER_SYSVIEW_MAJOR * 10000) + (SEGGER_SYSVIEW_MINOR * 100) + SEGGER_SYSVIEW_REV)
 
@@ -130,6 +130,10 @@ extern "C" {
 //
 #define   SYSVIEW_EVTID_EX_MARK            0
 #define   SYSVIEW_EVTID_EX_NAME_MARKER     1
+#define   SYSVIEW_EVTID_EX_HEAP_DEFINE     2
+#define   SYSVIEW_EVTID_EX_HEAP_ALLOC      3
+#define   SYSVIEW_EVTID_EX_HEAP_ALLOC_EX   4
+#define   SYSVIEW_EVTID_EX_HEAP_FREE       5
 //
 // Event masks to disable/enable events
 //
@@ -291,6 +295,11 @@ void SEGGER_SYSVIEW_MarkStart                     (unsigned int MarkerId);
 void SEGGER_SYSVIEW_MarkStop                      (unsigned int MarkerId);
 void SEGGER_SYSVIEW_Mark                          (unsigned int MarkerId);
 void SEGGER_SYSVIEW_NameMarker                    (unsigned int MarkerId, const char* sName);
+
+void SEGGER_SYSVIEW_HeapDefine                    (void* pHeap, void* pBase, unsigned int HeapSize, unsigned int MetadataSize);
+void SEGGER_SYSVIEW_HeapAlloc                     (void* pHeap, void* pUserData, unsigned int UserDataLen);
+void SEGGER_SYSVIEW_HeapAllocEx                   (void* pHeap, void* pUserData, unsigned int UserDataLen, unsigned int Tag);
+void SEGGER_SYSVIEW_HeapFree                      (void* pHeap, void* pUserData);
 
 void SEGGER_SYSVIEW_NameResource                  (U32 ResourceId, const char* sName);
 
