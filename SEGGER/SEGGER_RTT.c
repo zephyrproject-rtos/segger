@@ -254,7 +254,9 @@ Additional information:
 **********************************************************************
 */
 
-static unsigned char _aTerminalId[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+static const unsigned char _aTerminalId[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+
+static const char _aInitStr[] = "\0\0\0\0\0\0TTR REGGES";  // Init complete ID string to make sure that things also work if RTT is linked to a no-init memory area
 
 /*********************************************************************
 *
@@ -309,7 +311,7 @@ static unsigned char _ActiveTerminal;
                   volatile SEGGER_RTT_CB* pRTTCBInit;                                                \
                   pRTTCBInit = (volatile SEGGER_RTT_CB*)((char*)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF); \
                   do {                                                                               \
-                    if (pRTTCBInit->acID[0] == '\0') {                                               \
+                    if (pRTTCBInit->acID[0] != 'S') {                                                \
                       _DoInit();                                                                     \
                     }                                                                                \
                   } while (0);                                                                       \
@@ -317,7 +319,6 @@ static unsigned char _ActiveTerminal;
 
 static void _DoInit(void) {
   volatile SEGGER_RTT_CB* p;   // Volatile to make sure that compiler cannot change the order of accesses to the control block
-  static const char _aInitStr[] = "\0\0\0\0\0\0TTR REGGES";  // Init complete ID string to make sure that things also work if RTT is linked to a no-init memory area
   unsigned i;
   //
   // Initialize control block
@@ -1892,6 +1893,28 @@ int SEGGER_RTT_SetFlagsDownBuffer(unsigned BufferIndex, unsigned Flags) {
   return r;
 }
 
+#if defined(CONFIG_SEGGER_RTT_INIT_MODE_STRONG_CHECK)
+static void SEGGER_RTT_StrongCheckInit(void) {
+  volatile SEGGER_RTT_CB* p;
+  p = (volatile SEGGER_RTT_CB*)((char*)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);
+  unsigned i;
+  int DoInit = 0;
+
+  RTT__DMB();                       // Force order of memory accesses for cores that may perform out-of-order memory accesses
+  for (i = 0; i < sizeof(_aInitStr) - 1; ++i) {
+    if (p->acID[i] != _aInitStr[sizeof(_aInitStr) - 2 - i]) { // Skip terminating \0 at the end of the array
+        DoInit = 1;
+        break;
+    }
+  }
+  RTT__DMB();                       // Force order of memory accesses for cores that may perform out-of-order memory accesses
+
+  if (DoInit) {
+    _DoInit();
+  }
+}
+#endif
+
 /*********************************************************************
 *
 *       SEGGER_RTT_Init
@@ -1902,7 +1925,22 @@ int SEGGER_RTT_SetFlagsDownBuffer(unsigned BufferIndex, unsigned Flags) {
 *
 */
 void SEGGER_RTT_Init (void) {
+  /*
+   * The standard Segger code calls only _DoInit() here. This happens,
+   * for example, in a bootloader or in stand-alone applications.
+   * For applications started by a bootloader, Segger recommends not
+   * calling this function, as all the recommended APIs use INIT().
+   * Unfortunately Zephyr log backend uses SEGGER_RTT_WriteSkipNoLock()
+   * that doesn't call INIT(), so the additional two following variants
+   * have been added here for a safe API usage.
+   */
+#if defined(CONFIG_SEGGER_RTT_INIT_MODE_STRONG_CHECK)
+  SEGGER_RTT_StrongCheckInit();
+#elif defined(CONFIG_SEGGER_RTT_INIT_MODE_WEAK_CHECK)
+  INIT();
+#else
   _DoInit();
+#endif
 }
 
 /*********************************************************************
