@@ -96,6 +96,8 @@ Revision: $Rev: 24316 $
 
 #if defined(CONFIG_SEGGER_RTT_SECTION_DTCM)
 #define SEGGER_RTT_SECTION                        ".dtcm_data"
+#elif defined(CONFIG_SEGGER_RTT_SECTION_CCM)
+#define SEGGER_RTT_SECTION                        ".ccm_data"
 #elif defined(CONFIG_SEGGER_RTT_SECTION_CUSTOM)
 #define SEGGER_RTT_SECTION                        CONFIG_SEGGER_RTT_SECTION_CUSTOM_NAME
 #endif
