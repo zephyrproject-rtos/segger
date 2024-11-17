@@ -97,17 +97,17 @@ Purpose : Implementation of debug monitor for J-Link monitor mode debug on Corte
 **********************************************************************
 */
 
-/********************************************************************* 
-* 
+/*********************************************************************
+*
 *       JLINK_MONITOR_OnExit()
-* 
-*  Function description 
+*
+*  Function description
 *    Called from DebugMon_Handler(), once per debug exit.
 *    May perform some target specific operations to be done on debug mode exit.
-* 
-*  Notes 
+*
+*  Notes
 *    (1) Must not keep the CPU busy for more than 100 ms
-*/ 
+*/
 void JLINK_MONITOR_OnExit(void) {
   //
   // Add custom code here
@@ -115,17 +115,17 @@ void JLINK_MONITOR_OnExit(void) {
 //  BSP_ClrLED(0);
 }
 
-/********************************************************************* 
-* 
+/*********************************************************************
+*
 *       JLINK_MONITOR_OnEnter()
-* 
-*  Function description 
+*
+*  Function description
 *    Called from DebugMon_Handler(), once per debug entry.
 *    May perform some target specific operations to be done on debug mode entry
-* 
-*  Notes 
+*
+*  Notes
 *    (1) Must not keep the CPU busy for more than 100 ms
-*/ 
+*/
 void JLINK_MONITOR_OnEnter(void) {
   //
   // Add custom code here
@@ -134,14 +134,14 @@ void JLINK_MONITOR_OnEnter(void) {
 //  BSP_ClrLED(1);
 }
 
-/********************************************************************* 
-* 
+/*********************************************************************
+*
 *       JLINK_MONITOR_OnPoll()
-* 
-*  Function description 
+*
+*  Function description
 *    Called periodically from DebugMon_Handler(), to perform some actions that need to be performed periodically during debug mode.
-* 
-*  Notes 
+*
+*  Notes
 *    (1) Must not keep the CPU busy for more than 100 ms
 */
 void JLINK_MONITOR_OnPoll(void) {

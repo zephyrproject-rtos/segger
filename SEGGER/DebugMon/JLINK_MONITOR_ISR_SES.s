@@ -125,7 +125,7 @@ Purpose : Implementation of debug monitor for J-Link monitor mode
 
 /*
 * Defines for determining if the current debug config supports FPU registers
-* For some compilers like IAR EWARM when disabling the FPU in the compiler settings an error is thrown when 
+* For some compilers like IAR EWARM when disabling the FPU in the compiler settings an error is thrown when
 */
 #ifdef __FPU_PRESENT
   #if __FPU_PRESENT
@@ -137,13 +137,13 @@ Purpose : Implementation of debug monitor for J-Link monitor mode
   #define _HAS_FPU_REGS  0
 #endif
 
-/********************************************************************* 
-* 
+/*********************************************************************
+*
 *       Signature of monitor
-* 
-*  Function description 
+*
+*  Function description
 *    Needed for targets where also a boot ROM is present that possibly specifies a vector table with a valid debug monitor exception entry
-*/ 
+*/
         .section .text, "ax"
 
         //
@@ -166,17 +166,17 @@ Purpose : Implementation of debug monitor for J-Link monitor mode
         .byte 0x52
         .byte 0x00      // Align to 8-bytes
 
-/********************************************************************* 
-* 
+/*********************************************************************
+*
 *       z_arm_debug_monitor()
-* 
-*  Function description 
+*
+*  Function description
 *    Debug monitor handler. CPU enters this handler in case a "halt" request is made from the debugger.
 *    This handler is also responsible for handling commands that are sent by the debugger.
 *
-*  Notes 
+*  Notes
 *    This is actually the ISR for the debug inerrupt (exception no. 12)
-*/ 
+*/
         .thumb_func
 
 z_arm_debug_monitor:
@@ -279,8 +279,8 @@ _AddrCPACR:
         .section .text, "ax"
         .thumb_func
 
-;/********************************************************************* 
-;* 
+;/*********************************************************************
+;*
 ;*       _HandleGetMonVersion
 ;*
 ;*/
@@ -298,8 +298,8 @@ _HandleGetMonVersion:
         STR      R0,[R3, #+_SYSTEM_DEMCR_OFF]              // Indicate data ready
         B        _WaitProbeReadIndicateMonRdy
 
-/********************************************************************* 
-* 
+/*********************************************************************
+*
 *       _HandleReadReg
 *
 */
@@ -496,7 +496,7 @@ _HandleReadRegFPU:
         Read Coprocessor Access Control Register (CPACR) to check if CP10 and CP11 are enabled
         If not, access to floating point is not possible
         CPACR[21:20] == CP10 enable. 0b01 = Privileged access only. 0b11 = Full access. Other = reserved
-        CPACR[23:22] == CP11 enable. 0b01 = Privileged access only. 0b11 = Full access. Other = reserved 
+        CPACR[23:22] == CP11 enable. 0b01 = Privileged access only. 0b11 = Full access. Other = reserved
         */
         LDR      R0,_AddrCPACR
         LDR      R0,[R0]
@@ -546,67 +546,67 @@ _HandleReadFPS0_FPS31LazyMode:
         //
         VMOV     R0,S31                                // v = FPSx
         B        _HandleReadRegDone
-        VMOV     R0,S30  
+        VMOV     R0,S30
         B        _HandleReadRegDone
-        VMOV     R0,S29  
+        VMOV     R0,S29
         B        _HandleReadRegDone
-        VMOV     R0,S28  
+        VMOV     R0,S28
         B        _HandleReadRegDone
-        VMOV     R0,S27  
+        VMOV     R0,S27
         B        _HandleReadRegDone
-        VMOV     R0,S26  
+        VMOV     R0,S26
         B        _HandleReadRegDone
-        VMOV     R0,S25  
+        VMOV     R0,S25
         B        _HandleReadRegDone
-        VMOV     R0,S24  
+        VMOV     R0,S24
         B        _HandleReadRegDone
-        VMOV     R0,S23  
+        VMOV     R0,S23
         B        _HandleReadRegDone
-        VMOV     R0,S22  
+        VMOV     R0,S22
         B        _HandleReadRegDone
         VMOV     R0,S21
         B        _HandleReadRegDone
-        VMOV     R0,S20  
+        VMOV     R0,S20
         B        _HandleReadRegDone
-        VMOV     R0,S19  
+        VMOV     R0,S19
         B        _HandleReadRegDone
-        VMOV     R0,S18  
+        VMOV     R0,S18
         B        _HandleReadRegDone
-        VMOV     R0,S17  
+        VMOV     R0,S17
         B        _HandleReadRegDone
-        VMOV     R0,S16  
+        VMOV     R0,S16
         B        _HandleReadRegDone
-        VMOV     R0,S15  
+        VMOV     R0,S15
         B        _HandleReadRegDone
-        VMOV     R0,S14  
+        VMOV     R0,S14
         B        _HandleReadRegDone
-        VMOV     R0,S13  
+        VMOV     R0,S13
         B        _HandleReadRegDone
-        VMOV     R0,S12  
+        VMOV     R0,S12
         B        _HandleReadRegDone
         VMOV     R0,S11
         B        _HandleReadRegDone
-        VMOV     R0,S10  
+        VMOV     R0,S10
         B        _HandleReadRegDone
-        VMOV     R0,S9  
+        VMOV     R0,S9
         B        _HandleReadRegDone
-        VMOV     R0,S8  
+        VMOV     R0,S8
         B        _HandleReadRegDone
-        VMOV     R0,S7  
+        VMOV     R0,S7
         B        _HandleReadRegDone
-        VMOV     R0,S6  
+        VMOV     R0,S6
         B        _HandleReadRegDone
-        VMOV     R0,S5  
+        VMOV     R0,S5
         B        _HandleReadRegDone
-        VMOV     R0,S4  
+        VMOV     R0,S4
         B        _HandleReadRegDone
-        VMOV     R0,S3  
+        VMOV     R0,S3
         B        _HandleReadRegDone
-        VMOV     R0,S2  
+        VMOV     R0,S2
         B        _HandleReadRegDone
         VMOV     R0,S1
         B        _HandleReadRegDone
-        VMOV     R0,S0  
+        VMOV     R0,S0
         B        _HandleReadRegDone
 #else
         B        _HandleReadRegUnknown
@@ -803,7 +803,7 @@ _HandleWriteRegFPU:
         Read Coprocessor Access Control Register (CPACR) to check if CP10 and CP11 are enabled
         If not, access to floating point is not possible
         CPACR[21:20] == CP10 enable. 0b01 = Privileged access only. 0b11 = Full access. Other = reserved
-        CPACR[23:22] == CP11 enable. 0b01 = Privileged access only. 0b11 = Full access. Other = reserved 
+        CPACR[23:22] == CP11 enable. 0b01 = Privileged access only. 0b11 = Full access. Other = reserved
         */
         MOV      R12,R0                                  // Save register data
         LDR      R0,_AddrCPACR
@@ -854,67 +854,67 @@ _HandleWriteFPS0_FPS31LazyMode:
         //
         VMOV     S31,R12                                  // v = FPSx
         B        _HandleWriteRegDone
-        VMOV     S30,R12  
+        VMOV     S30,R12
         B        _HandleWriteRegDone
         VMOV     S29,R12
         B        _HandleWriteRegDone
         VMOV     S28,R12
         B        _HandleWriteRegDone
-        VMOV     S27,R12  
+        VMOV     S27,R12
         B        _HandleWriteRegDone
-        VMOV     S26,R12  
+        VMOV     S26,R12
         B        _HandleWriteRegDone
-        VMOV     S25,R12  
+        VMOV     S25,R12
         B        _HandleWriteRegDone
-        VMOV     S24,R12  
+        VMOV     S24,R12
         B        _HandleWriteRegDone
-        VMOV     S23,R12  
+        VMOV     S23,R12
         B        _HandleWriteRegDone
-        VMOV     S22,R12  
+        VMOV     S22,R12
         B        _HandleWriteRegDone
         VMOV     S21,R12
         B        _HandleWriteRegDone
-        VMOV     S20,R12  
+        VMOV     S20,R12
         B        _HandleWriteRegDone
-        VMOV     S19,R12  
+        VMOV     S19,R12
         B        _HandleWriteRegDone
-        VMOV     S18,R12  
+        VMOV     S18,R12
         B        _HandleWriteRegDone
-        VMOV     S17,R12  
+        VMOV     S17,R12
         B        _HandleWriteRegDone
-        VMOV     S16,R12  
+        VMOV     S16,R12
         B        _HandleWriteRegDone
-        VMOV     S15,R12  
+        VMOV     S15,R12
         B        _HandleWriteRegDone
-        VMOV     S14,R12  
+        VMOV     S14,R12
         B        _HandleWriteRegDone
-        VMOV     S13,R12  
+        VMOV     S13,R12
         B        _HandleWriteRegDone
-        VMOV     S12,R12  
+        VMOV     S12,R12
         B        _HandleWriteRegDone
         VMOV     S11,R12
         B        _HandleWriteRegDone
-        VMOV     S10,R12  
+        VMOV     S10,R12
         B        _HandleWriteRegDone
-        VMOV     S9,R12  
+        VMOV     S9,R12
         B        _HandleWriteRegDone
-        VMOV     S8,R12  
+        VMOV     S8,R12
         B        _HandleWriteRegDone
-        VMOV     S7,R12  
+        VMOV     S7,R12
         B        _HandleWriteRegDone
-        VMOV     S6,R12  
+        VMOV     S6,R12
         B        _HandleWriteRegDone
-        VMOV     S5,R12  
+        VMOV     S5,R12
         B        _HandleWriteRegDone
-        VMOV     S4,R12  
+        VMOV     S4,R12
         B        _HandleWriteRegDone
-        VMOV     S3,R12  
+        VMOV     S3,R12
         B        _HandleWriteRegDone
-        VMOV     S2,R12  
+        VMOV     S2,R12
         B        _HandleWriteRegDone
         VMOV     S1,R12
         B        _HandleWriteRegDone
-        VMOV     S0,R12  
+        VMOV     S0,R12
         B        _HandleWriteRegDone
 #else
         B        _HandleWriteRegUnknown
