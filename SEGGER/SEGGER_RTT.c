@@ -3,7 +3,7 @@
 *                        The Embedded Experts                        *
 **********************************************************************
 *                                                                    *
-*            (c) 1995 - 2021 SEGGER Microcontroller GmbH             *
+*            (c) 1995 - 2024 SEGGER Microcontroller GmbH             *
 *                                                                    *
 *       www.segger.com     Support: support@segger.com               *
 *                                                                    *
@@ -42,7 +42,7 @@
 *                                                                    *
 **********************************************************************
 *                                                                    *
-*       SystemView version: 3.40                                    *
+*       SystemView version: 3.58                                    *
 *                                                                    *
 **********************************************************************
 ---------------------------END-OF-HEADER------------------------------
@@ -50,7 +50,7 @@ File    : SEGGER_RTT.c
 Purpose : Implementation of SEGGER real-time transfer (RTT) which
           allows real-time communication on targets which support
           debugger memory accesses while the CPU is running.
-Revision: $Rev: 28168 $
+Revision: $Rev: 29668 $
 
 Additional information:
           Type "int" is assumed to be 32-bits in size
@@ -168,17 +168,11 @@ Additional information:
 #endif
 
 #ifndef   MIN
-  #define MIN(a, b)         (((a) < (b)) ? (a) : (b))
+  #define MIN(a, b)                                       (((a) < (b)) ? (a) : (b))
 #endif
 
 #ifndef   MAX
-  #define MAX(a, b)         (((a) > (b)) ? (a) : (b))
-#endif
-//
-// For some environments, NULL may not be defined until certain headers are included
-//
-#ifndef NULL
-  #define NULL 0
+  #define MAX(a, b)                                       (((a) > (b)) ? (a) : (b))
 #endif
 
 /*********************************************************************
@@ -304,18 +298,19 @@ static unsigned char _ActiveTerminal;
 *
 *  Function description
 *    Initializes the control block an buffers.
-*    May only be called via INIT() to avoid overriding settings.
 *
+*  Notes
+*    (1) May only be called via INIT() to avoid overriding settings.
+*        The only exception is SEGGER_RTT_Init(), to make an intentional override possible.
 */
-#define INIT()  {                                                                                    \
-                  volatile SEGGER_RTT_CB* pRTTCBInit;                                                \
-                  pRTTCBInit = (volatile SEGGER_RTT_CB*)((char*)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF); \
-                  do {                                                                               \
-                    if (pRTTCBInit->acID[0] != 'S') {                                                \
-                      _DoInit();                                                                     \
-                    }                                                                                \
-                  } while (0);                                                                       \
-                }
+  #define INIT()                                                                             \
+    do {                                                                                     \
+      volatile SEGGER_RTT_CB* pRTTCBInit;                                                    \
+      pRTTCBInit = (volatile SEGGER_RTT_CB*)((uintptr_t)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF); \
+      if (pRTTCBInit->acID[0] != 'S') {                                                      \
+        _DoInit();                                                                           \
+      }                                                                                      \
+    } while (0)
 
 static void _DoInit(void) {
   volatile SEGGER_RTT_CB* p;   // Volatile to make sure that compiler cannot change the order of accesses to the control block
@@ -323,7 +318,7 @@ static void _DoInit(void) {
   //
   // Initialize control block
   //
-  p                     = (volatile SEGGER_RTT_CB*)((char*)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);  // Access control block uncached so that nothing in the cache ever becomes dirty and all changes are visible in HW directly
+  p                     = (volatile SEGGER_RTT_CB*)((uintptr_t)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);  // Access control block uncached so that nothing in the cache ever becomes dirty and all changes are visible in HW directly
   memset((SEGGER_RTT_CB*)p, 0, sizeof(_SEGGER_RTT));         // Make sure that the RTT CB is always zero initialized.
   p->MaxNumUpBuffers    = SEGGER_RTT_MAX_NUM_UP_BUFFERS;
   p->MaxNumDownBuffers  = SEGGER_RTT_MAX_NUM_DOWN_BUFFERS;
@@ -585,7 +580,7 @@ unsigned SEGGER_RTT_ReadUpBufferNoLock(unsigned BufferIndex, void* pData, unsign
   volatile char*          pSrc;
 
   INIT();
-  pRing = (SEGGER_RTT_BUFFER_UP*)((char*)&_SEGGER_RTT.aUp[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRing = (SEGGER_RTT_BUFFER_UP*)((uintptr_t)&_SEGGER_RTT.aUp[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   pBuffer = (unsigned char*)pData;
   RdOff = pRing->RdOff;
   WrOff = pRing->WrOff;
@@ -677,7 +672,7 @@ unsigned SEGGER_RTT_ReadNoLock(unsigned BufferIndex, void* pData, unsigned Buffe
   volatile char*          pSrc;
   //
   INIT();
-  pRing = (SEGGER_RTT_BUFFER_DOWN*)((char*)&_SEGGER_RTT.aDown[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRing = (SEGGER_RTT_BUFFER_DOWN*)((uintptr_t)&_SEGGER_RTT.aDown[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   pBuffer = (unsigned char*)pData;
   RdOff = pRing->RdOff;
   WrOff = pRing->WrOff;
@@ -844,7 +839,7 @@ void SEGGER_RTT_WriteWithOverwriteNoLock(unsigned BufferIndex, const void* pBuff
   // Get "to-host" ring buffer and copy some elements into local variables.
   //
   pData = (const char *)pBuffer;
-  pRing = (SEGGER_RTT_BUFFER_UP*)((char*)&_SEGGER_RTT.aUp[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRing = (SEGGER_RTT_BUFFER_UP*)((uintptr_t)&_SEGGER_RTT.aUp[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   //
   // Check if we will overwrite data and need to adjust the RdOff.
   //
@@ -955,7 +950,7 @@ unsigned SEGGER_RTT_WriteSkipNoLock(unsigned BufferIndex, const void* pBuffer, u
   // 1) is the most common case for large buffers and assuming that J-Link reads the data fast enough
   //
   pData = (const char *)pBuffer;
-  pRing = (SEGGER_RTT_BUFFER_UP*)((char*)&_SEGGER_RTT.aUp[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRing = (SEGGER_RTT_BUFFER_UP*)((uintptr_t)&_SEGGER_RTT.aUp[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   RdOff = pRing->RdOff;
   WrOff = pRing->WrOff;
   pDst = (pRing->pBuffer + WrOff) + SEGGER_RTT_UNCACHED_OFF;
@@ -1037,7 +1032,7 @@ unsigned SEGGER_RTT_WriteDownBufferNoLock(unsigned BufferIndex, const void* pBuf
   // It is save to cast that to a "to-host" buffer. Up and Down buffer differ in volatility of offsets that might be modified by J-Link.
   //
   pData = (const char *)pBuffer;
-  pRing = (SEGGER_RTT_BUFFER_UP*)((char*)&_SEGGER_RTT.aDown[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRing = (SEGGER_RTT_BUFFER_UP*)((uintptr_t)&_SEGGER_RTT.aDown[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   //
   // How we output depends upon the mode...
   //
@@ -1111,7 +1106,7 @@ unsigned SEGGER_RTT_WriteNoLock(unsigned BufferIndex, const void* pBuffer, unsig
   // Get "to-host" ring buffer.
   //
   pData = (const char *)pBuffer;
-  pRing = (SEGGER_RTT_BUFFER_UP*)((char*)&_SEGGER_RTT.aUp[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRing = (SEGGER_RTT_BUFFER_UP*)((uintptr_t)&_SEGGER_RTT.aUp[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   //
   // How we output depends upon the mode...
   //
@@ -1275,7 +1270,7 @@ unsigned SEGGER_RTT_PutCharSkipNoLock(unsigned BufferIndex, char c) {
   //
   // Get "to-host" ring buffer.
   //
-  pRing = (SEGGER_RTT_BUFFER_UP*)((char*)&_SEGGER_RTT.aUp[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRing = (SEGGER_RTT_BUFFER_UP*)((uintptr_t)&_SEGGER_RTT.aUp[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   //
   // Get write position and handle wrap-around if necessary
   //
@@ -1330,7 +1325,7 @@ unsigned SEGGER_RTT_PutCharSkip(unsigned BufferIndex, char c) {
   //
   // Get "to-host" ring buffer.
   //
-  pRing = (SEGGER_RTT_BUFFER_UP*)((char*)&_SEGGER_RTT.aUp[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRing = (SEGGER_RTT_BUFFER_UP*)((uintptr_t)&_SEGGER_RTT.aUp[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   //
   // Get write position and handle wrap-around if necessary
   //
@@ -1389,7 +1384,7 @@ unsigned SEGGER_RTT_PutChar(unsigned BufferIndex, char c) {
   //
   // Get "to-host" ring buffer.
   //
-  pRing = (SEGGER_RTT_BUFFER_UP*)((char*)&_SEGGER_RTT.aUp[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRing = (SEGGER_RTT_BUFFER_UP*)((uintptr_t)&_SEGGER_RTT.aUp[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   //
   // Get write position and handle wrap-around if necessary
   //
@@ -1496,7 +1491,7 @@ int SEGGER_RTT_HasKey(void) {
   int r;
 
   INIT();
-  pRing = (SEGGER_RTT_BUFFER_DOWN*)((char*)&_SEGGER_RTT.aDown[0] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRing = (SEGGER_RTT_BUFFER_DOWN*)((uintptr_t)&_SEGGER_RTT.aDown[0] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   RdOff = pRing->RdOff;
   if (RdOff != pRing->WrOff) {
     r = 1;
@@ -1522,7 +1517,7 @@ unsigned SEGGER_RTT_HasData(unsigned BufferIndex) {
   SEGGER_RTT_BUFFER_DOWN* pRing;
   unsigned                v;
 
-  pRing = (SEGGER_RTT_BUFFER_DOWN*)((char*)&_SEGGER_RTT.aDown[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRing = (SEGGER_RTT_BUFFER_DOWN*)((uintptr_t)&_SEGGER_RTT.aDown[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   v = pRing->WrOff;
   return v - pRing->RdOff;
 }
@@ -1543,7 +1538,7 @@ unsigned SEGGER_RTT_HasDataUp(unsigned BufferIndex) {
   SEGGER_RTT_BUFFER_UP* pRing;
   unsigned                v;
 
-  pRing = (SEGGER_RTT_BUFFER_UP*)((char*)&_SEGGER_RTT.aUp[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRing = (SEGGER_RTT_BUFFER_UP*)((uintptr_t)&_SEGGER_RTT.aUp[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   v = pRing->RdOff;
   return pRing->WrOff - v;
 }
@@ -1574,7 +1569,7 @@ int SEGGER_RTT_AllocDownBuffer(const char* sName, void* pBuffer, unsigned Buffer
 
   INIT();
   SEGGER_RTT_LOCK();
-  pRTTCB = (volatile SEGGER_RTT_CB*)((unsigned char*)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);  // Access RTTCB uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRTTCB = (volatile SEGGER_RTT_CB*)((uintptr_t)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);  // Access RTTCB uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   BufferIndex = 0;
   do {
     if (pRTTCB->aDown[BufferIndex].pBuffer == NULL) {
@@ -1623,7 +1618,7 @@ int SEGGER_RTT_AllocUpBuffer(const char* sName, void* pBuffer, unsigned BufferSi
 
   INIT();
   SEGGER_RTT_LOCK();
-  pRTTCB = (volatile SEGGER_RTT_CB*)((unsigned char*)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);  // Access RTTCB uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRTTCB = (volatile SEGGER_RTT_CB*)((uintptr_t)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);  // Access RTTCB uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   BufferIndex = 0;
   do {
     if (pRTTCB->aUp[BufferIndex].pBuffer == NULL) {
@@ -1678,7 +1673,7 @@ int SEGGER_RTT_ConfigUpBuffer(unsigned BufferIndex, const char* sName, void* pBu
   volatile SEGGER_RTT_BUFFER_UP* pUp;
 
   INIT();
-  pRTTCB = (volatile SEGGER_RTT_CB*)((unsigned char*)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);  // Access RTTCB uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRTTCB = (volatile SEGGER_RTT_CB*)((uintptr_t)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);  // Access RTTCB uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   if (BufferIndex < SEGGER_RTT_MAX_NUM_UP_BUFFERS) {
     SEGGER_RTT_LOCK();
     pUp = &pRTTCB->aUp[BufferIndex];
@@ -1730,7 +1725,7 @@ int SEGGER_RTT_ConfigDownBuffer(unsigned BufferIndex, const char* sName, void* p
   volatile SEGGER_RTT_BUFFER_DOWN* pDown;
 
   INIT();
-  pRTTCB = (volatile SEGGER_RTT_CB*)((unsigned char*)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);  // Access RTTCB uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRTTCB = (volatile SEGGER_RTT_CB*)((uintptr_t)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);  // Access RTTCB uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   if (BufferIndex < SEGGER_RTT_MAX_NUM_DOWN_BUFFERS) {
     SEGGER_RTT_LOCK();
     pDown = &pRTTCB->aDown[BufferIndex];
@@ -1773,7 +1768,7 @@ int SEGGER_RTT_SetNameUpBuffer(unsigned BufferIndex, const char* sName) {
   volatile SEGGER_RTT_BUFFER_UP* pUp;
 
   INIT();
-  pRTTCB = (volatile SEGGER_RTT_CB*)((unsigned char*)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);  // Access RTTCB uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRTTCB = (volatile SEGGER_RTT_CB*)((uintptr_t)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);  // Access RTTCB uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   if (BufferIndex < SEGGER_RTT_MAX_NUM_UP_BUFFERS) {
     SEGGER_RTT_LOCK();
     pUp = &pRTTCB->aUp[BufferIndex];
@@ -1808,7 +1803,7 @@ int SEGGER_RTT_SetNameDownBuffer(unsigned BufferIndex, const char* sName) {
   volatile SEGGER_RTT_BUFFER_DOWN* pDown;
 
   INIT();
-  pRTTCB = (volatile SEGGER_RTT_CB*)((unsigned char*)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);  // Access RTTCB uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRTTCB = (volatile SEGGER_RTT_CB*)((uintptr_t)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);  // Access RTTCB uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   if (BufferIndex < SEGGER_RTT_MAX_NUM_DOWN_BUFFERS) {
     SEGGER_RTT_LOCK();
     pDown = &pRTTCB->aDown[BufferIndex];
@@ -1844,7 +1839,7 @@ int SEGGER_RTT_SetFlagsUpBuffer(unsigned BufferIndex, unsigned Flags) {
   volatile SEGGER_RTT_BUFFER_UP* pUp;
 
   INIT();
-  pRTTCB = (volatile SEGGER_RTT_CB*)((unsigned char*)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);  // Access RTTCB uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRTTCB = (volatile SEGGER_RTT_CB*)((uintptr_t)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);  // Access RTTCB uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   if (BufferIndex < SEGGER_RTT_MAX_NUM_UP_BUFFERS) {
     SEGGER_RTT_LOCK();
     pUp = &pRTTCB->aUp[BufferIndex];
@@ -1880,7 +1875,7 @@ int SEGGER_RTT_SetFlagsDownBuffer(unsigned BufferIndex, unsigned Flags) {
   volatile SEGGER_RTT_BUFFER_DOWN* pDown;
 
   INIT();
-  pRTTCB = (volatile SEGGER_RTT_CB*)((unsigned char*)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);  // Access RTTCB uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRTTCB = (volatile SEGGER_RTT_CB*)((uintptr_t)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);  // Access RTTCB uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   if (BufferIndex < SEGGER_RTT_MAX_NUM_DOWN_BUFFERS) {
     SEGGER_RTT_LOCK();
     pDown = &pRTTCB->aDown[BufferIndex];
@@ -1896,7 +1891,7 @@ int SEGGER_RTT_SetFlagsDownBuffer(unsigned BufferIndex, unsigned Flags) {
 #if defined(CONFIG_SEGGER_RTT_INIT_MODE_STRONG_CHECK)
 static void SEGGER_RTT_StrongCheckInit(void) {
   volatile SEGGER_RTT_CB* p;
-  p = (volatile SEGGER_RTT_CB*)((char*)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);
+  p = (volatile SEGGER_RTT_CB*)((uintptr_t)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);
   unsigned i;
   int DoInit = 0;
 
@@ -1971,7 +1966,7 @@ int SEGGER_RTT_SetTerminal (unsigned char TerminalId) {
   ac[0] = 0xFFu;
   if (TerminalId < sizeof(_aTerminalId)) { // We only support a certain number of channels
     ac[1] = _aTerminalId[TerminalId];
-    pRing = (SEGGER_RTT_BUFFER_UP*)((char*)&_SEGGER_RTT.aUp[0] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+    pRing = (SEGGER_RTT_BUFFER_UP*)((uintptr_t)&_SEGGER_RTT.aUp[0] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
     SEGGER_RTT_LOCK();                     // Lock to make sure that no other task is writing into buffer, while we are and number of free bytes in buffer does not change downwards after checking and before writing
     if ((pRing->Flags & SEGGER_RTT_MODE_MASK) == SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL) {
       _ActiveTerminal = TerminalId;
@@ -2023,7 +2018,7 @@ int SEGGER_RTT_TerminalOut (unsigned char TerminalId, const char* s) {
     //
     // Get "to-host" ring buffer.
     //
-    pRing = (SEGGER_RTT_BUFFER_UP*)((char*)&_SEGGER_RTT.aUp[0] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+    pRing = (SEGGER_RTT_BUFFER_UP*)((uintptr_t)&_SEGGER_RTT.aUp[0] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
     //
     // Need to be able to change terminal, write data, change back.
     // Compute the fixed and variable sizes.
@@ -2100,7 +2095,7 @@ int SEGGER_RTT_TerminalOut (unsigned char TerminalId, const char* s) {
 unsigned SEGGER_RTT_GetAvailWriteSpace (unsigned BufferIndex) {
   SEGGER_RTT_BUFFER_UP* pRing;
 
-  pRing = (SEGGER_RTT_BUFFER_UP*)((char*)&_SEGGER_RTT.aUp[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRing = (SEGGER_RTT_BUFFER_UP*)((uintptr_t)&_SEGGER_RTT.aUp[BufferIndex] + SEGGER_RTT_UNCACHED_OFF);  // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   return _GetAvailWriteSpace(pRing);
 }
 
@@ -2127,7 +2122,7 @@ unsigned SEGGER_RTT_GetBytesInBuffer(unsigned BufferIndex) {
   // Avoid warnings regarding volatile access order.  It's not a problem
   // in this case, but dampen compiler enthusiasm.
   //
-  pRTTCB = (volatile SEGGER_RTT_CB*)((unsigned char*)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);  // Access RTTCB uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+  pRTTCB = (volatile SEGGER_RTT_CB*)((uintptr_t)&_SEGGER_RTT + SEGGER_RTT_UNCACHED_OFF);  // Access RTTCB uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
   RdOff = pRTTCB->aUp[BufferIndex].RdOff;
   WrOff = pRTTCB->aUp[BufferIndex].WrOff;
   if (RdOff <= WrOff) {
