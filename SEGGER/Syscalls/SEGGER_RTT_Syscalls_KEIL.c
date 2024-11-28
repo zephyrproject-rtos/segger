@@ -3,7 +3,7 @@
 *                        The Embedded Experts                        *
 **********************************************************************
 *                                                                    *
-*            (c) 1995 - 2021 SEGGER Microcontroller GmbH             *
+*            (c) 1995 - 2024 SEGGER Microcontroller GmbH             *
 *                                                                    *
 *       www.segger.com     Support: support@segger.com               *
 *                                                                    *
@@ -42,14 +42,14 @@
 *                                                                    *
 **********************************************************************
 *                                                                    *
-*       SystemView version: 3.40                                    *
+*       SystemView version: 3.58                                    *
 *                                                                    *
 **********************************************************************
 ---------------------------END-OF-HEADER------------------------------
 File    : RTT_Syscalls_KEIL.c
 Purpose : Retargeting module for KEIL MDK-CM3.
           Low-level functions for using printf() via RTT
-Revision: $Rev: 24316 $
+Revision: $Rev: 29653 $
 Notes   : (1) https://wiki.segger.com/Keil_MDK-ARM#RTT_in_uVision
 ----------------------------------------------------------------------
 */
@@ -201,32 +201,6 @@ int _sys_write(FILEHANDLE hFile, const unsigned char * pBuffer, unsigned NumByte
 
 /*********************************************************************
 *
-*       _sys_read
-*
-*  Function description:
-*    Reads data from an open handle.
-*    Currently this modules does nothing.
-*
-*  Parameters:
-*    hFile    - Handle to a file opened via _sys_open
-*    pBuffer  - Pointer to buffer to store the read data
-*    NumBytes      - Number of bytes to read
-*    Mode     - The Mode that shall be used
-*
-*  Return value:
-*    Number of bytes read from the file/device
-*
-*/
-int _sys_read(FILEHANDLE hFile, unsigned char * pBuffer, unsigned NumBytes, int Mode) {
-  (void)hFile;
-  (void)pBuffer;
-  (void)NumBytes;
-  (void)Mode;
-  return (0);  // Not implemented
-}
-
-/*********************************************************************
-*
 *       _sys_istty
 *
 *  Function description:
@@ -271,25 +245,6 @@ int _sys_seek(FILEHANDLE hFile, long Pos) {
 
 /*********************************************************************
 *
-*       _sys_ensure
-*
-*  Function description:
-*
-*
-*  Parameters:
-*    hFile    - Handle to a file opened via _sys_open
-*
-*  Return value:
-*    int       -
-*
-*/
-int _sys_ensure(FILEHANDLE hFile) {
-  (void)hFile;
-  return (-1);  // Not implemented
-}
-
-/*********************************************************************
-*
 *       _sys_flen
 *
 *  Function description:
@@ -305,6 +260,52 @@ int _sys_ensure(FILEHANDLE hFile) {
 long _sys_flen(FILEHANDLE hFile) {
   (void)hFile;
   return (0);  // Not implemented
+}
+
+#if (__ARMCC_VERSION <= 6000000) // The following functions are not required to be implemented for CC version > 6.
+/*********************************************************************
+*
+*       _sys_read
+*
+*  Function description:
+*    Reads data from an open handle.
+*    Currently this modules does nothing.
+*
+*  Parameters:
+*    hFile    - Handle to a file opened via _sys_open
+*    pBuffer  - Pointer to buffer to store the read data
+*    NumBytes      - Number of bytes to read
+*    Mode     - The Mode that shall be used
+*
+*  Return value:
+*    Number of bytes read from the file/device
+*
+*/
+int _sys_read(FILEHANDLE hFile, unsigned char * pBuffer, unsigned NumBytes, int Mode) {
+  (void)hFile;
+  (void)pBuffer;
+  (void)NumBytes;
+  (void)Mode;
+  return (0);  // Not implemented
+}
+
+/*********************************************************************
+*
+*       _sys_ensure
+*
+*  Function description:
+*
+*
+*  Parameters:
+*    hFile    - Handle to a file opened via _sys_open
+*
+*  Return value:
+*    int       -
+*
+*/
+int _sys_ensure(FILEHANDLE hFile) {
+  (void)hFile;
+  return (-1);  // Not implemented
 }
 
 /*********************************************************************
@@ -325,12 +326,21 @@ long _sys_flen(FILEHANDLE hFile) {
 *     0 - Success
 *
 */
+#if __ARMCC_VERSION >= 6190000
+void _sys_tmpnam(char * pBuffer, int FileNum, unsigned MaxLen) {
+  (void)pBuffer;
+  (void)FileNum;
+  (void)MaxLen;
+  return;      // Not implemented
+}
+#else
 int _sys_tmpnam(char * pBuffer, int FileNum, unsigned MaxLen) {
   (void)pBuffer;
   (void)FileNum;
   (void)MaxLen;
   return (1);  // Not implemented
 }
+#endif
 
 /*********************************************************************
 *
@@ -389,5 +399,6 @@ int stdout_putchar(int ch) {
 }
 #endif
 
-#endif
+#endif // #if __ARMCC_VERSION <= 6000000
+#endif // #if (defined __CC_ARM) || (defined __ARMCC_VERSION)
 /*************************** End of file ****************************/

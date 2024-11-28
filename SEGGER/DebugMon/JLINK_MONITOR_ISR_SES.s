@@ -62,7 +62,7 @@ Purpose : Implementation of debug monitor for J-Link monitor mode
         .extern JLINK_MONITOR_OnExit
         .extern JLINK_MONITOR_OnPoll
 
-        .global z_arm_debug_monitor
+        .global DebugMon_Handler
 
 /*********************************************************************
 *
@@ -168,7 +168,7 @@ Purpose : Implementation of debug monitor for J-Link monitor mode
 
 /*********************************************************************
 *
-*       z_arm_debug_monitor()
+*       DebugMon_Handler()
 *
 *  Function description
 *    Debug monitor handler. CPU enters this handler in case a "halt" request is made from the debugger.
@@ -179,7 +179,7 @@ Purpose : Implementation of debug monitor for J-Link monitor mode
 */
         .thumb_func
 
-z_arm_debug_monitor:
+DebugMon_Handler:
         /*
         General procedure:
         DCRDR is used as communication register
