@@ -87,7 +87,7 @@ uint32_t sysview_get_interrupt(void);
 #define SEGGER_SYSVIEW_RTT_CHANNEL	CONFIG_SEGGER_SYSVIEW_RTT_CHANNEL
 
 #if defined(CONFIG_SEGGER_SYSVIEW_SECTION_DTCM)
-#define SEGGER_SYSVIEW_SECTION ".dtcm_data"
+#define SEGGER_SYSVIEW_SECTION ".dtcm_bss"
 #endif
 
 extern unsigned int zephyr_rtt_irq_lock(void);
