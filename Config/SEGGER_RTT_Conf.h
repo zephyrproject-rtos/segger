@@ -57,6 +57,11 @@ Revision: $Rev: 24316 $
 #ifndef SEGGER_RTT_CONF_H
 #define SEGGER_RTT_CONF_H
 
+#if defined(CONFIG_SEGGER_RTT_SECTION_CUSTOM_DTS_REGION)
+#include <zephyr/devicetree.h>
+#include <zephyr/linker/devicetree_regions.h>
+#endif
+
 #ifdef __IAR_SYSTEMS_ICC__
   #include <intrinsics.h>
 #endif
@@ -98,7 +103,13 @@ Revision: $Rev: 24316 $
 #define SEGGER_RTT_SECTION                        ".dtcm_data"
 #elif defined(CONFIG_SEGGER_RTT_SECTION_CCM)
 #define SEGGER_RTT_SECTION                        ".ccm_data"
-#elif defined(CONFIG_SEGGER_RTT_SECTION_CUSTOM) || defined(CONFIG_SEGGER_RTT_SECTION_CUSTOM_DTS_REGION)
+#elif defined(CONFIG_SEGGER_RTT_SECTION_CUSTOM_DTS_REGION)
+#if DT_HAS_ALIAS(rtt_custom_section)
+#define SEGGER_RTT_SECTION LINKER_DT_NODE_REGION_NAME(DT_ALIAS(rtt_custom_section))
+#else
+#error "rtt_custom_section alias is missing in the device tree"
+#endif
+#elif defined(CONFIG_SEGGER_RTT_SECTION_CUSTOM)
 #define SEGGER_RTT_SECTION                        CONFIG_SEGGER_RTT_SECTION_CUSTOM_NAME
 #endif
 
