@@ -41,10 +41,6 @@
 * DAMAGE.                                                            *
 *                                                                    *
 **********************************************************************
-*                                                                    *
-*       SystemView version: 3.58                                    *
-*                                                                    *
-**********************************************************************
 -------------------------- END-OF-HEADER -----------------------------
 
 File    : SEGGER_SYSVIEW_Conf.h
@@ -84,10 +80,14 @@ uint32_t sysview_get_interrupt(void);
 
 #define SEGGER_SYSVIEW_RTT_BUFFER_SIZE	CONFIG_SEGGER_SYSVIEW_RTT_BUFFER_SIZE
 #define SEGGER_SYSVIEW_POST_MORTEM_MODE CONFIG_SEGGER_SYSVIEW_POST_MORTEM_MODE
-#define SEGGER_SYSVIEW_RTT_CHANNEL	CONFIG_SEGGER_SYSVIEW_RTT_CHANNEL
+#define SEGGER_SYSVIEW_RTT_CHANNEL	    CONFIG_SEGGER_SYSVIEW_RTT_CHANNEL
 
 #if defined(CONFIG_SEGGER_SYSVIEW_SECTION_DTCM)
-#define SEGGER_SYSVIEW_SECTION ".dtcm_bss"
+  #define SEGGER_SYSVIEW_SECTION ".dtcm_bss"
+#endif
+
+#if !(defined SEGGER_SYSVIEW_SECTION) && (defined SEGGER_RTT_BUFFER_SECTION)
+  #define SEGGER_SYSVIEW_SECTION SEGGER_RTT_BUFFER_SECTION
 #endif
 
 extern unsigned int zephyr_rtt_irq_lock(void);
