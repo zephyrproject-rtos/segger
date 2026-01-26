@@ -20,6 +20,8 @@ download contains both RTT and SystemView sources.
 #### Monitor mode debugging
 [Download][9] "Example project" from the Monitor mode debugging [webpage][10].
 
+In SEGGER/DebugMon/JLINK_MONITOR_ISR_SES.s rename `DebugMon_Handler` to `z_arm_debug_monitor`.
+
 ### Updating to a new Segger release
 Upgrading to a new Segger release means migrating existing Zephyr changes to the latest Segger
 code. There are many tools (`diff`, `patch`, `git diff`, etc.) and different approaches to

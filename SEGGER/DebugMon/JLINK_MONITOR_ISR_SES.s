@@ -62,7 +62,7 @@ Purpose : Implementation of debug monitor for J-Link monitor mode
         .extern JLINK_MONITOR_OnExit
         .extern JLINK_MONITOR_OnPoll
 
-        .global DebugMon_Handler
+        .global z_arm_debug_monitor
 
 /*********************************************************************
 *
@@ -188,7 +188,7 @@ Purpose : Implementation of debug monitor for J-Link monitor mode
 
 /*********************************************************************
 *
-*       DebugMon_Handler()
+*       z_arm_debug_monitor()
 *
 *  Function description
 *    Debug monitor handler. CPU enters this handler in case a "halt" request is made from the debugger.
@@ -198,7 +198,7 @@ Purpose : Implementation of debug monitor for J-Link monitor mode
 *    This is actually the ISR for the debug interrupt (exception no. 12)
 */
         .thumb_func
-DebugMon_Handler:
+z_arm_debug_monitor: // Zephyr: Rename DebugMon_Handler to z_arm_debug_monitor
         /*
         General procedure:
         DCRDR is used as communication register
