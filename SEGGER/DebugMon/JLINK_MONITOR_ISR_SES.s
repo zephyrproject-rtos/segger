@@ -4,7 +4,7 @@
 *                           www.segger.com                           *
 **********************************************************************
 *                                                                    *
-*            (c) 1995 - 2020 SEGGER Microcontroller GmbH             *
+*            (c) 1995 - 2025 SEGGER Microcontroller GmbH             *
 *                                                                    *
 *       www.segger.com     Support: support@segger.com               *
 *                                                                    *
@@ -71,7 +71,7 @@ Purpose : Implementation of debug monitor for J-Link monitor mode
 **********************************************************************
 */
 
-#define _MON_VERSION  100  // V x.yy
+#define _MON_VERSION                    110  // V x.yy
 
 /*********************************************************************
 *
@@ -80,14 +80,24 @@ Purpose : Implementation of debug monitor for J-Link monitor mode
 **********************************************************************
 */
 
-#define _APP_SP_OFF_R0                  0x00
-#define _APP_SP_OFF_R1                  0x04
-#define _APP_SP_OFF_R2                  0x08
-#define _APP_SP_OFF_R3                  0x0C
-#define _APP_SP_OFF_R12                 0x10
-#define _APP_SP_OFF_R14_LR              0x14
-#define _APP_SP_OFF_PC                  0x18
-#define _APP_SP_OFF_XPSR                0x1C
+#define _APP_SP_IDX_R0                  0x00
+#define _APP_SP_IDX_R1                  0x01
+#define _APP_SP_IDX_R2                  0x02
+#define _APP_SP_IDX_R3                  0x03
+#define _APP_SP_IDX_R12                 0x04
+#define _APP_SP_IDX_R14_LR              0x05
+#define _APP_SP_IDX_PC                  0x06
+#define _APP_SP_IDX_XPSR                0x07
+
+#define _APP_SP_OFF_R0                  (_APP_SP_IDX_R0     * 4)
+#define _APP_SP_OFF_R1                  (_APP_SP_IDX_R1     * 4)
+#define _APP_SP_OFF_R2                  (_APP_SP_IDX_R2     * 4)
+#define _APP_SP_OFF_R3                  (_APP_SP_IDX_R3     * 4)
+#define _APP_SP_OFF_R12                 (_APP_SP_IDX_R12    * 4)
+#define _APP_SP_OFF_R14_LR              (_APP_SP_IDX_R14_LR * 4)
+#define _APP_SP_OFF_PC                  (_APP_SP_IDX_PC     * 4)
+#define _APP_SP_OFF_XPSR                (_APP_SP_IDX_XPSR   * 4)
+
 #define _APP_SP_OFF_S0                  0x20
 #define _APP_SP_OFF_S1                  0x24
 #define _APP_SP_OFF_S2                  0x28
@@ -106,22 +116,24 @@ Purpose : Implementation of debug monitor for J-Link monitor mode
 #define _APP_SP_OFF_S15                 0x5C
 #define _APP_SP_OFF_FPSCR               0x60
 
+#define _NUM_BYTES_ADD_STATE_CONTEXT    40
+#define _NUM_BYTES_ADD_FPU_CONTEXT      64
 #define _NUM_BYTES_BASIC_STACKFRAME     32
-#define _NUM_BYTES_EXTENDED_STACKFRAME  104        // Values for stackframes are explained at location where they are used
+#define _NUM_BYTES_EXTENDED_STACKFRAME  104            // Values for stackframes are explained at location where they are used
 
 #define _SYSTEM_DCRDR_OFF               0x00
 #define _SYSTEM_DEMCR_OFF               0x04
 
-#define _SYSTEM_DHCSR                   0xE000EDF0 // Debug Halting Control and Status Register (DHCSR)
-#define _SYSTEM_DCRSR                   0xE000EDF4 // Debug Core Register Selector Register (DCRSR)
-#define _SYSTEM_DCRDR                   0xE000EDF8 // Debug Core Register Data Register (DCRDR)
-#define _SYSTEM_DEMCR                   0xE000EDFC // Debug Exception and Monitor Control Register (DEMCR)
+#define _SYSTEM_DHCSR                   0xE000EDF0     // Debug Halting Control and Status Register (DHCSR)
+#define _SYSTEM_DCRSR                   0xE000EDF4     // Debug Core Register Selector Register (DCRSR)
+#define _SYSTEM_DCRDR                   0xE000EDF8     // Debug Core Register Data Register (DCRDR)
+#define _SYSTEM_DEMCR                   0xE000EDFC     // Debug Exception and Monitor Control Register (DEMCR)
 
-#define _SYSTEM_FPCCR                   0xE000EF34 // Floating-Point Context Control Register (FPCCR)
-#define _SYSTEM_FPCAR                   0xE000EF38 // Floating-Point Context Address Register (FPCAR)
-#define _SYSTEM_FPDSCR                  0xE000EF3C // Floating-Point Default Status Control Register (FPDSCR)
-#define _SYSTEM_MVFR0                   0xE000EF40 // Media and FP Feature Register 0 (MVFR0)
-#define _SYSTEM_MVFR1                   0xE000EF44 // Media and FP Feature Register 1 (MVFR1)
+#define _SYSTEM_FPCCR                   0xE000EF34     // Floating-Point Context Control Register (FPCCR)
+#define _SYSTEM_FPCAR                   0xE000EF38     // Floating-Point Context Address Register (FPCAR)
+#define _SYSTEM_FPDSCR                  0xE000EF3C     // Floating-Point Default Status Control Register (FPDSCR)
+#define _SYSTEM_MVFR0                   0xE000EF40     // Media and FP Feature Register 0 (MVFR0)
+#define _SYSTEM_MVFR1                   0xE000EF44     // Media and FP Feature Register 1 (MVFR1)
 
 /*
 * Defines for determining if the current debug config supports FPU registers
@@ -135,6 +147,14 @@ Purpose : Implementation of debug monitor for J-Link monitor mode
   #endif
 #else
   #define _HAS_FPU_REGS  0
+#endif
+
+#if (defined(__ARM_ARCH_8M_MAIN__) || defined(__ARM_ARCH_8M_BASE__) || defined(__ARM_ARCH_8_1M_MAIN__))
+  #define _IS_ARM_V8M 1
+#elif (defined(__ARM_ARCH_7M__) || defined(__ARM_ARCH_7EM__))
+  #define _IS_ARM_V7M 1
+#else
+  #error "Unsupported ARM architecture"
 #endif
 
 /*********************************************************************
@@ -175,10 +195,9 @@ Purpose : Implementation of debug monitor for J-Link monitor mode
 *    This handler is also responsible for handling commands that are sent by the debugger.
 *
 *  Notes
-*    This is actually the ISR for the debug inerrupt (exception no. 12)
+*    This is actually the ISR for the debug interrupt (exception no. 12)
 */
         .thumb_func
-
 DebugMon_Handler:
         /*
         General procedure:
@@ -197,33 +216,38 @@ DebugMon_Handler:
         PUSH     {LR}
         BL       JLINK_MONITOR_OnEnter
         POP      {LR}
-        LDR.N    R3,_AddrDCRDR                             // 0xe000edf8 == _SYSTEM_DCRDR
         B.N      _IndicateMonReady
-_WaitProbeReadIndicateMonRdy:                              // while(_SYSTEM_DEMCR & (1uL << 19));  => Wait until J-Link has read item
-        LDR      R0,[R3, #+_SYSTEM_DEMCR_OFF]              // _SYSTEM_DEMCR
+_TransferDataToProbe:
+        STR      R0,[R3, #+_SYSTEM_DCRDR_OFF]          // DCRDR = v;
+        LDR      R0,[R3, #+_SYSTEM_DEMCR_OFF]          // _SYSTEM_DEMCR |= (1uL << 19);  => Set MON_REQ bit, so J-Link knows monitor has placed data
+        ORR      R0,R0,#0x80000
+        STR      R0,[R3, #+_SYSTEM_DEMCR_OFF]
+_WaitProbeReadIndicateMonRdy:                          // while(_SYSTEM_DEMCR & (1uL << 19));  => Wait until J-Link has read item
+        LDR      R0,[R3, #+_SYSTEM_DEMCR_OFF]          // _SYSTEM_DEMCR
         LSLS     R0,R0,#+12
         BMI.N    _WaitProbeReadIndicateMonRdy
 _IndicateMonReady:
-        LDR      R0,[R3, #+_SYSTEM_DEMCR_OFF]              // _SYSTEM_DEMCR |= (1uL << 19);  => Set MON_REQ bit, so J-Link knows monitor is ready to receive commands
+        LDR.N    R3,_AddrDCRDR                         // 0xe000edf8 == _SYSTEM_DCRDR
+        LDR      R0,[R3, #+_SYSTEM_DEMCR_OFF]          // _SYSTEM_DEMCR |= (1uL << 19);  => Set MON_REQ bit, so J-Link knows monitor is ready to receive commands
         ORR      R0,R0,#0x80000
         STR      R0,[R3, #+_SYSTEM_DEMCR_OFF]
         /*
         During command loop:
         R0  = Tmp
         R1  = Tmp
-        R2  = Tmp
+        R2  = Stack Pointer
         R3  = &_SYSTEM_DCRDR  (allows also access to DEMCR with offset)
         R12 = Tmp
 
         Outside command loop R0-R3 and R12 may be overwritten by MONITOR_OnPoll()
         */
-_WaitForJLinkCmd:                                          // do {
+_WaitForJLinkCmd:                                      // do {
         PUSH     {LR}
         BL       JLINK_MONITOR_OnPoll
         POP      {LR}
-        LDR.N    R3,_AddrDCRDR                             // 0xe000edf8 == _SYSTEM_DCRDR
+        LDR.N    R3,_AddrDCRDR                         // 0xe000edf8 == _SYSTEM_DCRDR
         LDR      R0,[R3, #+_SYSTEM_DEMCR_OFF]
-        LSRS     R0,R0,#+20                                // DEMCR[19] -> Carry Clear? => J-Link has placed command for us
+        LSRS     R0,R0,#+20                            // DEMCR[19] -> Carry Clear? => J-Link has placed command for us
         BCS     _WaitForJLinkCmd
         /*
         Perform command
@@ -239,28 +263,59 @@ _WaitForJLinkCmd:                                          // do {
         Protocol for different commands:
           J-Link: Cmd -> DCRDR,  DEMCR[19] -> 0 => Cmd placed by probe
         */
-        LDR      R0,[R3, #+_SYSTEM_DCRDR_OFF]              // ParamInfo = _SYSTEM_DCRDR
-        LSRS     R1,R0,#+8                                 // ParamInfo >>= 8
+        LDR      R0,[R3, #+_SYSTEM_DCRDR_OFF]          // ParamInfo = _SYSTEM_DCRDR
+        LSRS     R1,R0,#+8                             // ParamInfo >>= 8
         LSLS     R0,R0,#+24
-        LSRS     R0,R0,#+24                                // Cmd = ParamInfo & 0xFF
+        LSRS     R0,R0,#+24                            // Cmd = ParamInfo & 0xFF
+#if _IS_ARM_V8M
+        //
+        // Check if Security Extension (TrustZone) is implemented
+        //
+        LDR.N    R2,_AddrDAUTHSTATUS
+        LDR      R2,[R2]
+        LSLS     R2,R2,#+24
+        LSRS     R2,R2,#+28
+        BEQ      _NoTrustZone                          // [7:4] == 0 => No TrustZone support
+_TrustZone:
+        LSRS     R2,LR,#+7                             // Shift LR[6] into carry => Carry set means secure stack
+        BCS      _Secure_SP
+_NonSecure_SP:
+        LSRS     R2,LR,#+3                             // Shift LR[2] into carry => Carry clear means that CPU was running on MSP
+        ITE      CS
+        MRSCS    R2,PSP_NS
+        MRSCC    R2,MSP_NS
+        B        _Continue
+_Secure_SP:
+#endif
+_NoTrustZone:
+        //
+        // ARMv7-M or ARMv8-M Secure/Default (without TrustZone)
+        //
+        LSRS     R2,LR,#+3                             // Shift LR[2] into carry => Carry clear means that CPU was running on MSP
+        ITE      CS
+        MRSCS    R2,PSP
+        MRSCC    R2,MSP
+_Continue:
         //
         // switch (Cmd)
         //
         CMP      R0,#+0
-        BEQ.N    _HandleGetMonVersion                      // case _MON_CMD_GET_MONITOR_VERSION
+        BEQ.N    _HandleGetMonVersion                  // case _MON_CMD_GET_MONITOR_VERSION
         CMP      R0,#+2
-        BEQ.N    _HandleReadReg                            // case _MON_CMD_READ_REG
-        BCC.N    _HandleRestartCPU                         // case _MON_CMD_RESTART_CPU
+        BEQ.N    _HandleReadReg                        // case _MON_CMD_READ_REG
+        BCC.N    _HandleRestartCPU                     // case _MON_CMD_RESTART_CPU
         CMP      R0,#+3
-        BEQ.N    _HandleWriteReg_Veneer                    // case _MON_CMD_WRITE_REG
-        B.N      _IndicateMonReady                         // default : while (1);
+        BEQ.N    _HandleWriteReg_Veneer                // case _MON_CMD_WRITE_REG
+        CMP      R0,#+4
+        BEQ.N    _HandleReadExceptionLR                // case _MON_CMD_READ_EX_LR
+        B.N      _IndicateMonReady                     // default : while (1);
         /*
         Return
         _MON_CMD_RESTART_CPU
           CPU:                   DEMCR[19] -> 0 => Monitor no longer ready
         */
 _HandleRestartCPU:
-        LDR      R0,[R3, #+_SYSTEM_DEMCR_OFF]              // _SYSTEM_DEMCR &= ~(1uL << 19);  => Clear MON_REQ to indicate that monitor is no longer active
+        LDR      R0,[R3, #+_SYSTEM_DEMCR_OFF]          // _SYSTEM_DEMCR &= ~(1uL << 19);  => Clear MON_REQ to indicate that monitor is no longer active
         BIC      R0,R0,#0x80000
         STR      R0,[R3, #+_SYSTEM_DEMCR_OFF]
         PUSH     {LR}
@@ -271,6 +326,8 @@ _HandleRestartCPU:
         //
         .section .text, "ax", %progbits
         .align 2
+_AddrDAUTHSTATUS:
+        .long     0xE000EFB8
 _AddrDCRDR:
         .long     0xE000EDF8
 _AddrCPACR:
@@ -279,11 +336,26 @@ _AddrCPACR:
         .section .text, "ax"
         .thumb_func
 
-;/*********************************************************************
-;*
-;*       _HandleGetMonVersion
-;*
-;*/
+/*********************************************************************
+*
+*       _HandleReadExceptionLR
+*
+*/
+_HandleReadExceptionLR:
+        /*
+        _MON_CMD_GET_MONITOR_VERSION
+          CPU:    Data -> DCRDR, DEMCR[19] -> 1 => Data ready
+          J-Link: DCRDR -> Read, DEMCR[19] -> 0 => Data read
+          CPU:                   DEMCR[19] -> 1 => Mon ready
+        */
+        MOVS     R0,LR
+        B        _TransferDataToProbe
+
+/*********************************************************************
+*
+*       _HandleGetMonVersion
+*
+*/
 _HandleGetMonVersion:
         /*
         _MON_CMD_GET_MONITOR_VERSION
@@ -292,11 +364,7 @@ _HandleGetMonVersion:
           CPU:                   DEMCR[19] -> 1 => Mon ready
         */
         MOVS     R0,#+_MON_VERSION
-        STR      R0,[R3, #+_SYSTEM_DCRDR_OFF]              // _SYSTEM_DCRDR = x
-        LDR      R0,[R3, #+_SYSTEM_DEMCR_OFF]              // _SYSTEM_DEMCR |= (1uL << 19);  => Set MON_REQ bit, so J-Link knows monitor is ready to receive commands
-        ORR      R0,R0,#0x80000
-        STR      R0,[R3, #+_SYSTEM_DEMCR_OFF]              // Indicate data ready
-        B        _WaitProbeReadIndicateMonRdy
+        B        _TransferDataToProbe
 
 /*********************************************************************
 *
@@ -312,7 +380,6 @@ _HandleReadReg:
           J-Link: DCRDR -> Read, DEMCR[19] -> 0 => Data read
           CPU:                   DEMCR[19] -> 1 => Mon ready
 
-
         Register indexes
         0-15: R0-R15       (13 == R13 reserved => is banked ... Has to be read as PSP / MSP. Decision has to be done by J-Link DLL side!)
         16: XPSR
@@ -326,94 +393,109 @@ _HandleReadReg:
         Register usage when entering this "subroutine":
         R0 Cmd
         R1 ParamInfo
-        R2 ---
+        R2 Stack Pointer
         R3  = &_SYSTEM_DCRDR  (allows also access to DEMCR with offset)
         R12 ---
 
         Table B1-9 EXC_RETURN definition of exception return behavior, with FP extension
-        LR           Return to     Return SP   Frame type
-        ---------------------------------------------------------
-        0xFFFFFFE1   Handler mode. MSP         Extended
-        0xFFFFFFE9   Thread mode   MSP         Extended
-        0xFFFFFFED   Thread mode   PSP         Extended
-        0xFFFFFFF1   Handler mode. MSP         Basic
-        0xFFFFFFF9   Thread mode   MSP         Basic
-        0xFFFFFFFD   Thread mode   PSP         Basic
+        LR          Stack security    Return to     Return SP   Frame type
+        ------------------------------------------------------------------
+        0xFFFFFFE1  Secure stack      Handler mode. MSP         Extended
+        0xFFFFFFE9  Secure stack      Thread mode   MSP         Extended
+        0xFFFFFFED  Secure stack      Thread mode   PSP         Extended
+        0xFFFFFFF1  Secure stack      Handler mode. MSP         Basic
+        0xFFFFFFF9  Secure stack      Thread mode   MSP         Basic
+        0xFFFFFFFD  Secure stack      Thread mode   PSP         Basic
+        0xFFFFFFA1  Non-secure stack  Handler mode. MSP         Extended
+        0xFFFFFFA9  Non-Secure stack  Thread mode   MSP         Extended
+        0xFFFFFFAD  Non-Secure stack  Thread mode   PSP         Extended
+        0xFFFFFFB1  Non-Secure stack  Handler mode. MSP         Basic
+        0xFFFFFFB9  Non-Secure stack  Thread mode   MSP         Basic
+        0xFFFFFFBD  Non-Secure stack  Thread mode   PSP         Basic
 
-        So LR[2] == 1 => Return stack == PSP else MSP
+        Bit    Value 1                    Value 0
+        ----------------------------------------------------------------
+        LR[6]  Secure stack               Non-secure stack
+        LR[5]  Additional Stack skipped   Additional Stack already on stack
+        LR[4]  Standard frame             Extended frame
+        LR[3]  Thread mode                Handler mode
+        LR[2]  PSP return stack           MSP return stack
+        LR[1]  Always zero                Always zero
+        LR[0]  Exception secure           Exception non-secure
 
         R0-R3, R12, PC, xPSR can be read from application stackpointer
         Other regs can be read directly
         */
-        LSRS     R2,LR,#+3                         // Shift LR[2] into carry => Carry clear means that CPU was running on MSP
-        ITE      CS
-        MRSCS    R2,PSP
-        MRSCC    R2,MSP
-        CMP      R1,#+4                            // if (RegIndex < 4) { (R0-R3)
+#if _IS_ARM_V8M
+        LSRS     R12,LR,#+6                            // Shift LR[5] into carry => Carry clear means that CPU has saved additional stack state
+        IT       CC
+        ADDCC    R2,R2,#+_NUM_BYTES_ADD_STATE_CONTEXT  // Additional state context is saved, skip them on stack
+#endif
+_HandleReadRegR0_3:
+        CMP      R1,#+4                                // if (RegIndex < 4) { (R0-R3)
         BCS      _HandleReadRegR4
-        LDR      R0,[R2, R1, LSL #+2]              // v = [SP + Rx * 4] (R0-R3)
+        LDR      R0,[R2, R1, LSL #+2]                  // v = [SP + R1 * 4] (R0-R3)
         B.N      _HandleReadRegDone
 _HandleReadRegR4:
-        CMP      R1,#+5                          // if (RegIndex < 5) { (R4)
+        CMP      R1,#+5                                // if (RegIndex < 5) { (R4)
         BCS      _HandleReadRegR5
         MOV      R0,R4
         B.N      _HandleReadRegDone
 _HandleReadRegR5:
-        CMP      R1,#+6                          // if (RegIndex < 6) { (R5)
+        CMP      R1,#+6                                // if (RegIndex < 6) { (R5)
         BCS      _HandleReadRegR6
         MOV      R0,R5
         B.N      _HandleReadRegDone
 _HandleReadRegR6:
-        CMP      R1,#+7                          // if (RegIndex < 7) { (R6)
+        CMP      R1,#+7                                // if (RegIndex < 7) { (R6)
         BCS      _HandleReadRegR7
         MOV      R0,R6
         B.N      _HandleReadRegDone
 _HandleReadRegR7:
-        CMP      R1,#+8                          // if (RegIndex < 8) { (R7)
+        CMP      R1,#+8                                // if (RegIndex < 8) { (R7)
         BCS      _HandleReadRegR8
         MOV      R0,R7
         B.N      _HandleReadRegDone
 _HandleReadRegR8:
-        CMP      R1,#+9                          // if (RegIndex < 9) { (R8)
+        CMP      R1,#+9                                // if (RegIndex < 9) { (R8)
         BCS      _HandleReadRegR9
         MOV      R0,R8
         B.N      _HandleReadRegDone
 _HandleReadRegR9:
-        CMP      R1,#+10                         // if (RegIndex < 10) { (R9)
+        CMP      R1,#+10                               // if (RegIndex < 10) { (R9)
         BCS      _HandleReadRegR10
         MOV      R0,R9
         B.N      _HandleReadRegDone
 _HandleReadRegR10:
-        CMP      R1,#+11                         // if (RegIndex < 11) { (R10)
+        CMP      R1,#+11                               // if (RegIndex < 11) { (R10)
         BCS      _HandleReadRegR11
         MOV      R0,R10
         B.N      _HandleReadRegDone
 _HandleReadRegR11:
-        CMP      R1,#+12                         // if (RegIndex < 12) { (R11)
+        CMP      R1,#+12                               // if (RegIndex < 12) { (R11)
         BCS      _HandleReadRegR12
         MOV      R0,R11
         B.N      _HandleReadRegDone
 _HandleReadRegR12:
-        CMP      R1,#+14                         // if (RegIndex < 14) { (R12)
+        CMP      R1,#+14                               // if (RegIndex < 14) { (R12)
         BCS      _HandleReadRegR14
         LDR      R0,[R2, #+_APP_SP_OFF_R12]
         B.N      _HandleReadRegDone
 _HandleReadRegR14:
-        CMP      R1,#+15                         // if (RegIndex < 15) { (R14 / LR)
+        CMP      R1,#+15                               // if (RegIndex < 15) { (R14 / LR)
         BCS      _HandleReadRegR15
         LDR      R0,[R2, #+_APP_SP_OFF_R14_LR]
         B.N      _HandleReadRegDone
 _HandleReadRegR15:
-        CMP      R1,#+16                         // if (RegIndex < 16) { (R15 / PC)
+        CMP      R1,#+16                               // if (RegIndex < 16) { (R15 / PC)
         BCS      _HandleReadRegXPSR
         LDR      R0,[R2, #+_APP_SP_OFF_PC]
         B.N      _HandleReadRegDone
 _HandleReadRegXPSR:
-        CMP      R1,#+17                         // if (RegIndex < 17) { (xPSR)
+        CMP      R1,#+17                               // if (RegIndex < 17) { (xPSR)
         BCS      _HandleReadRegMSP
         LDR      R0,[R2, #+_APP_SP_OFF_XPSR]
         B.N      _HandleReadRegDone
-_HandleReadRegMSP:
         /*
         Stackpointer is tricky because we need to get some info about the SP used in the user app, first
 
@@ -435,63 +517,74 @@ _HandleReadRegMSP:
         Stack pointer handling is complicated because it is different what is pushed on the stack before entering the monitor ISR...
         Cortex-M: 8 regs
         Cortex-M + forced-stack-alignment: 8 regs + 1 dummy-word if stack was not 8-byte aligned
-        Cortex-M + FPU: 8 regs + 17 FPU regs + 1 dummy-word + 1-dummy word if stack was not 8-byte aligned
-        Cortex-M + FPU + lazy mode: 8 regs + 17 dummy-words + 1 dummy-word + 1-dummy word if stack was not 8-byte aligned
+        Cortex-M + FPU: 8 regs + 17 FPU regs + VPR reg + 1-dummy word if stack was not 8-byte aligned
+        Cortex-M + FPU + lazy mode: 8 regs + 17 dummy-words + VPR reg + 1-dummy word if stack was not 8-byte aligned
+
+        VPR is only implemented in ARMv8.1-M with MVE extension. Otherwise the space for this register is reserved.
         */
-        CMP      R1,#+18                           // if (RegIndex < 18) { (MSP)
+_HandleReadRegMSP:
+        CMP      R1,#+18                               // if (RegIndex < 18) { (MSP)
         BCS      _HandleReadRegPSP
-        MRS      R0,MSP
-        LSRS     R1,LR,#+3                         // LR[2] -> Carry == 0 => CPU was running on MSP => Needs correction
-        BCS      _HandleReadRegDone_Veneer         // CPU was running on PSP? => No correction necessary
-_HandleSPCorrection:
-        LSRS     R1,LR,#+5                         // LR[4] -> Carry == 0 => extended stack frame has been allocated. See ARM DDI0403D, B1.5.7 Stack alignment on exception entry
+#if _IS_ARM_V8M
+        LSRS     R1,LR,#+7                             // Shift LR[6] into carry => Carry set means that CPU was in secure mode
         ITE      CS
-        ADDCS    R0,R0,#+_NUM_BYTES_BASIC_STACKFRAME
-        ADDCC    R0,R0,#+_NUM_BYTES_EXTENDED_STACKFRAME
-        LDR      R1,[R2, #+_APP_SP_OFF_XPSR]       // Get xPSR from application stack (R2 has been set to app stack on beginning of _HandleReadReg)
-        LSRS     R1,R1,#+5                         // xPSR[9] -> Carry == 1 => Stack has been force-aligned before pushing regs. See ARM DDI0403D, B1.5.7 Stack alignment on exception entry
-        IT       CS
-        ADDCS    R0,R0,#+4
-        B        _HandleReadRegDone
-_HandleReadRegPSP:                                 // RegIndex == 18
-        CMP      R1,#+19                           // if (RegIndex < 19) {
+        MRSCS    R0,MSP
+        MRSCC    R0,MSP_NS
+#else
+        MRS      R0,MSP
+#endif
+        LSRS     R1,LR,#+3                             // LR[2] -> Carry == 0 => CPU was running on MSP => Needs correction
+        BCS      _HandleReadRegDone                    // CPU was running on PSP => No correction necessary
+        MOV      R1,LR
+        B        _HandleSPCorrection                   // CPU was running on MSP => Correction is necessary
+_HandleReadRegPSP:                                     // RegIndex == 18
+        CMP      R1,#+19                               // if (RegIndex < 19) {
         BCS      _HandleReadRegCFBP
-        MRS      R0,PSP                            // PSP is not touched by monitor
-        LSRS     R1,LR,#+3                         // LR[2] -> Carry == 1 => CPU was running on PSP => Needs correction
-        BCC      _HandleReadRegDone_Veneer         // CPU was running on MSP? => No correction of PSP necessary
-        B        _HandleSPCorrection
+#if _IS_ARM_V8M
+        LSRS     R1,LR,#+7                             // Shift LR[6] into carry => Carry set means that CPU was in secure mode
+        ITE      CS
+        MRSCS    R0,PSP
+        MRSCC    R0,PSP_NS
+#else
+        MRS      R0,PSP
+#endif
+        LSRS     R1,LR,#+3                             // LR[2] -> Carry == 1 => CPU was running on PSP => Needs correction
+        BCC      _HandleReadRegDone                    // CPU was running on MSP => No correction of PSP necessary
+        MOV      R1,LR
+        B        _HandleSPCorrection                   // CPU was running on PSP => Correction is necessary
 _HandleReadRegCFBP:
         /*
         CFBP is a register that can only be read via debug probe and is a merger of the following regs:
         CONTROL/FAULTMASK/BASEPRI/PRIMASK (packed into 4 bytes of word. CONTROL = CFBP[31:24], FAULTMASK = CFBP[16:23], BASEPRI = CFBP[15:8], PRIMASK = CFBP[7:0]
         To keep J-Link side the same for monitor and halt mode, we also return CFBP in monitor mode
         */
-        CMP      R1,#+20                           // if (RegIndex < 20) { (CFBP)
+        CMP      R1,#+20                               // if (RegIndex < 20) { (CFBP)
         BCS      _HandleReadRegFPU
+_ReadRegCFBP:
         MOVS     R0,#+0
         MRS      R2,PRIMASK
-        ORRS     R0,R2                             // Merge PRIMASK into CFBP[7:0]
+        ORRS     R0,R2                                 // Merge PRIMASK into CFBP[7:0]
         MRS      R2,BASEPRI
-        LSLS     R2,R2,#+8                         // Merge BASEPRI into CFBP[15:8]
+        LSLS     R2,R2,#+8                             // Merge BASEPRI into CFBP[15:8]
         ORRS     R0,R2
         MRS      R2,FAULTMASK
-        LSLS     R2,R2,#+16                        // Merge FAULTMASK into CFBP[23:16]
+        LSLS     R2,R2,#+16                            // Merge FAULTMASK into CFBP[23:16]
         ORRS     R0,R2
         MRS      R2,CONTROL
-        LSRS     R1,LR,#3                               // LR[2] -> Carry. CONTROL.SPSEL is saved to LR[2] on exception entry => ARM DDI0403D, B1.5.6 Exception entry behavior
-        IT       CS                                     // As J-Link sees value of CONTROL at application time, we need reconstruct original value of CONTROL
-        ORRCS    R2,R2,#+2                              // CONTROL.SPSEL (CONTROL[1]) == 0 inside monitor
-        LSRS     R1,LR,#+5                              // LR[4] == NOT(CONTROL.FPCA)  -> Carry
-        ITE      CS                                     // Merge original value of FPCA (CONTROL[2]) into read data
-        BICCS    R2,R2,#+0x04                           // Remember LR contains NOT(CONTROL)
+        LSRS     R1,LR,#3                              // LR[2] -> Carry. CONTROL.SPSEL is saved to LR[2] on exception entry => ARM DDI0403D, B1.5.6 Exception entry behavior
+        IT       CS                                    // As J-Link sees value of CONTROL at application time, we need reconstruct original value of CONTROL
+        ORRCS    R2,R2,#+2                             // CONTROL.SPSEL (CONTROL[1]) == 0 inside monitor
+        LSRS     R1,LR,#+5                             // LR[4] == NOT(CONTROL.FPCA)  -> Carry
+        ITE      CS                                    // Merge original value of FPCA (CONTROL[2]) into read data
+        BICCS    R2,R2,#+0x04                          // Remember LR contains NOT(CONTROL)
         ORRCC    R2,R2,#+0x04
         LSLS     R2,R2,#+24
         ORRS     R0,R2
         B.N      _HandleReadRegDone
 _HandleReadRegFPU:
-#if _HAS_FPU_REGS
         CMP      R1,#+53                               // if (RegIndex < 53) { (20 (FPSCR), 21-52 FPS0-FPS31)
-        BCS      _HandleReadRegDone_Veneer
+        BCS      _HandleReadRegsARMv8
+#if _HAS_FPU_REGS
         /*
         Read Coprocessor Access Control Register (CPACR) to check if CP10 and CP11 are enabled
         If not, access to floating point is not possible
@@ -505,39 +598,38 @@ _HandleReadRegFPU:
         CMP      R0,#+0xF
         BEQ      _HandleReadRegFPU_Allowed
         CMP      R0,#+0x5
-        BNE      _HandleReadRegDone_Veneer
+        BNE      _HandleReadRegDone
 _HandleReadRegFPU_Allowed:
-        CMP      R1,#+21                                  // if (RegIndex < 21) (20 == FPSCR)
+        CMP      R1,#+21                               // if (RegIndex < 21) (20 == FPSCR)
         BCS      _HandleReadRegFPS0_FPS31
-        LSRS     R0,LR,#+5                                // CONTROL[2] == FPCA => NOT(FPCA) saved to LR[4]. LR[4] == 0 => Extended stack frame, so FPU regs possibly on stack
-        BCS      _HandleReadFPSCRLazyMode                 // Remember: NOT(FPCA) is stored to LR. == 0 means: Extended stack frame
+        LSRS     R0,LR,#+5                             // CONTROL[2] == FPCA => NOT(FPCA) saved to LR[4]. LR[4] == 0 => Extended stack frame, so FPU regs possibly on stack
+        BCS      _HandleReadFPSCRLazyMode              // Remember: NOT(FPCA) is stored to LR. == 0 means: Extended stack frame
         LDR      R0,=_SYSTEM_FPCCR
         LDR      R0,[R0]
-        LSLS     R0,R0,#+2                                // FPCCR[30] -> Carry == 1 indicates if lazy mode is active, so space on stack is reserved but FPU registers are not saved on stack
+        LSLS     R0,R0,#+2                             // FPCCR[30] -> Carry == 1 indicates if lazy mode is active, so space on stack is reserved but FPU registers are not saved on stack
         BCS      _HandleReadFPSCRLazyMode
         LDR      R0,[R2, #+_APP_SP_OFF_FPSCR]
         B        _HandleReadRegDone
 _HandleReadFPSCRLazyMode:
         VMRS     R0,FPSCR
         B        _HandleReadRegDone
-_HandleReadRegFPS0_FPS31:                                 // RegIndex == 21-52
-        LSRS     R0,LR,#+5                                // CONTROL[2] == FPCA => NOT(FPCA) saved to LR[4]. LR[4] == 0 => Extended stack frame, so FPU regs possibly on stack
-        BCS      _HandleReadFPS0_FPS31LazyMode            // Remember: NOT(FPCA) is stored to LR. == 0 means: Extended stack frame
+_HandleReadRegFPS0_FPS31:                              // RegIndex == 21-52
+        LSRS     R0,LR,#+5                             // CONTROL[2] == FPCA => NOT(FPCA) saved to LR[4]. LR[4] == 0 => Extended stack frame, so FPU regs possibly on stack
+        BCS      _HandleReadFPS0_FPS31LazyMode         // Remember: NOT(FPCA) is stored to LR. == 0 means: Extended stack frame
         LDR      R0,=_SYSTEM_FPCCR
         LDR      R0,[R0]
-        LSLS     R0,R0,#+2                                // FPCCR[30] -> Carry == 1 indicates if lazy mode is active, so space on stack is reserved but FPU registers are not saved on stack
+        LSLS     R0,R0,#+2                             // FPCCR[30] -> Carry == 1 indicates if lazy mode is active, so space on stack is reserved but FPU registers are not saved on stack
         BCS      _HandleReadFPS0_FPS31LazyMode
-        SUBS     R1,#+21                                  // Convert absolute reg index into rel. one
-        LSLS     R1,R1,#+2                                // RegIndex to position on stack
+        SUBS     R1,#+21                               // Convert absolute reg index into rel. one
+        LSLS     R1,R1,#+2                             // RegIndex to position on stack
         ADDS     R1,#+_APP_SP_OFF_S0
         LDR      R0,[R2, R1]
-_HandleReadRegDone_Veneer:
         B        _HandleReadRegDone
 _HandleReadFPS0_FPS31LazyMode:
-        SUBS R1,#+20                                   // convert abs. RegIndex into rel. one
-        MOVS R0,#+6
-        MULS R1,R0,R1
-        LDR R0,=_HandleReadRegUnknown
+        SUBS     R1,#+20                               // convert abs. RegIndex into rel. one
+        MOVS     R0,#+6
+        MULS     R1,R0,R1
+        LDR      R0,=_FPUJumpTableReadEnd
         SUB      R0,R0,R1                              // _HandleReadRegUnknown - 6 * ((RegIndex - 21) + 1)
         ORR      R0,R0,#1                              // Thumb bit needs to be set in DestAddr
         BX       R0
@@ -608,26 +700,112 @@ _HandleReadFPS0_FPS31LazyMode:
         B        _HandleReadRegDone
         VMOV     R0,S0
         B        _HandleReadRegDone
+_FPUJumpTableReadEnd:
 #else
         B        _HandleReadRegUnknown
-_HandleReadRegDone_Veneer:
-        B        _HandleReadRegDone
+#endif
+_HandleReadRegsARMv8:
+#if _IS_ARM_V8M
+_HandleReadRegMSP_NS:
+        CMP      R1,#+65                               // if (RegIndex < 65) { (MSP_NS)
+        BCS      _HandleReadRegPSP_NS
+        MRS      R0,MSP_NS
+        TST      LR,#64
+        BNE      _HandleReadRegDone                    // Secure (LR[6] == 1) => Not selected
+        TST      LR,#4
+        BNE      _HandleReadRegDone                    // Stack was PSP (LR[3] == 1) =>  Not selected
+        MOV      R1,LR
+        B        _HandleSPCorrection
+_HandleReadRegPSP_NS:
+        CMP      R1,#+66                               // if (RegIndex < 66) { (PSP_NS)
+        BCS      _HandleReadRegMSP_S
+        MRS      R0,PSP_NS
+        TST      LR,#64
+        BNE      _HandleReadRegDone                    // Secure (LR[6] == 1) => Not selected
+        TST      LR,#4
+        BEQ      _HandleReadRegDone                    // Stack was MSP (LR[3] == 0) => Not selected
+        MOV      R1,LR
+        B        _HandleSPCorrection
+_HandleReadRegMSP_S:
+        CMP      R1,#+67                               // if (RegIndex < 67) { (MSP_S)
+        BCS      _HandleReadRegPSP_S
+        MRS      R0,MSP
+        TST      LR,#64
+        BEQ      _HandleReadRegDone                    // Non-secure (LR[6] == 0) => Not selected
+        TST      LR,#4
+        BNE      _HandleReadRegDone                    // Stack was PSP (LR[3] == 1) =>  Not selected
+        MOV      R1,LR
+        B        _HandleSPCorrection
+_HandleReadRegPSP_S:
+        CMP      R1,#+68                               // if (RegIndex < 68) { (PSP_S)
+        BCS      _HandleReadRegMSPLIM_S
+        MRS      R0,PSP
+        TST      LR,#64
+        BEQ      _HandleReadRegDone                    // Non-secure (LR[6] == 0) => Not selected
+        TST      LR,#4
+        BEQ      _HandleReadRegDone                    // Stack was MSP (LR[3] == 0) =>  Not selected
+        MOV      R1,LR
+        B        _HandleSPCorrection
+_HandleReadRegMSPLIM_S:
+        CMP      R1,#+69                               // if (RegIndex < 69) { (MSPLIM_S)
+        BCS      _HandleReadRegPSPLIM_S
+        MRS      R0,MSPLIM
+        B.N      _HandleReadRegDone
+_HandleReadRegPSPLIM_S:
+        CMP      R1,#+70                               // if (RegIndex < 70) { (PSPLIM_S)
+        BCS      _HandleReadRegMSPLIM_NS
+        MRS      R0,PSPLIM
+        B.N      _HandleReadRegDone
+_HandleReadRegMSPLIM_NS:
+        CMP      R1,#+71                               // if (RegIndex < 71) { (MSPLIM_NS)
+        BCS      _HandleReadRegPSPLIM_NS
+        MRS      R0,MSPLIM_NS
+        B.N      _HandleReadRegDone
+_HandleReadRegPSPLIM_NS:
+        CMP      R1,#+72                               // if (RegIndex < 72) { (PSPLIM_NS)
+        BCS      _HandleReadRegCFBP_S
+        MRS      R0,PSPLIM_NS
+        B.N      _HandleReadRegDone
+_HandleReadRegCFBP_S:
+        CMP      R1,#+75                               // if (RegIndex < 75) { (CFBP_S)
+        BCS      _HandleReadRegCFBP_NS
+        BCC      _ReadRegCFBP                          // Point to secure/default variant
+_HandleReadRegCFBP_NS:
+        /*
+        CFBP is a register that can only be read via debug probe and is a merger of the following regs:
+        CONTROL/FAULTMASK/BASEPRI/PRIMASK (packed into 4 bytes of word. CONTROL = CFBP[31:24], FAULTMASK = CFBP[16:23], BASEPRI = CFBP[15:8], PRIMASK = CFBP[7:0]
+        To keep J-Link side the same for monitor and halt mode, we also return CFBP in monitor mode
+        */
+        CMP      R1,#+76                               // if (RegIndex < 76) { (CFBP_NS)
+        BCS      _HandleReadRegUnknown
+        MOVS     R0,#+0
+        MRS      R2,PRIMASK_NS
+        ORRS     R0,R2                                 // Merge PRIMASK into CFBP[7:0]
+        MRS      R2,BASEPRI_NS
+        LSLS     R2,R2,#+8                             // Merge BASEPRI into CFBP[15:8]
+        ORRS     R0,R2
+        MRS      R2,FAULTMASK_NS
+        LSLS     R2,R2,#+16                            // Merge FAULTMASK into CFBP[23:16]
+        ORRS     R0,R2
+        MRS      R2,CONTROL_NS                         // Merge CONTROL into CFBP[31:24]
+        LSLS     R2,R2,#+24
+        ORRS     R0,R2
+        B.N      _HandleReadRegDone
+#else
+        B        _HandleReadRegUnknown
 #endif
 _HandleReadRegUnknown:
         MOVS     R0,#+0                                // v = 0
         B.N      _HandleReadRegDone
 _HandleReadRegDone:
-
-        // Send register content to J-Link and wait until J-Link has read the data
-
-        STR      R0,[R3, #+_SYSTEM_DCRDR_OFF]          // DCRDR = v;
-        LDR      R0,[R3, #+_SYSTEM_DEMCR_OFF]          // _SYSTEM_DEMCR |= (1uL << 19);  => Set MON_REQ bit, so J-Link knows monitor is ready to receive commands
-        ORR      R0,R0,#0x80000
-        STR      R0,[R3, #+_SYSTEM_DEMCR_OFF]          // Indicate data ready
-        B        _WaitProbeReadIndicateMonRdy
+        B        _TransferDataToProbe
 
         // Data section for register addresses
-
+/*********************************************************************
+*
+*       _HandleWriteReg
+*
+*/
 _HandleWriteReg:
         /*
         _MON_CMD_WRITE_REG
@@ -648,104 +826,116 @@ _HandleWriteReg:
         Register usage when entering this "subroutine":
         R0 Cmd
         R1 ParamInfo
-        R2 ---
-        R3  = &_SYSTEM_DCRDR  (allows also access to DEMCR with offset)
+        R2 Stack Pointer
+        R3  = &_SYSTEM_DCRDR  (allows also access to DEMCR with offset), later tmp variable
         R12 ---
 
         Table B1-9 EXC_RETURN definition of exception return behavior, with FP extension
-        LR           Return to     Return SP   Frame type
-        ---------------------------------------------------------
-        0xFFFFFFE1   Handler mode. MSP         Extended
-        0xFFFFFFE9   Thread mode   MSP         Extended
-        0xFFFFFFED   Thread mode   PSP         Extended
-        0xFFFFFFF1   Handler mode. MSP         Basic
-        0xFFFFFFF9   Thread mode   MSP         Basic
-        0xFFFFFFFD   Thread mode   PSP         Basic
+        LR          Stack security    Return to     Return SP   Frame type
+        ------------------------------------------------------------------
+        0xFFFFFFE1  Secure stack      Handler mode. MSP         Extended
+        0xFFFFFFE9  Secure stack      Thread mode   MSP         Extended
+        0xFFFFFFED  Secure stack      Thread mode   PSP         Extended
+        0xFFFFFFF1  Secure stack      Handler mode. MSP         Basic
+        0xFFFFFFF9  Secure stack      Thread mode   MSP         Basic
+        0xFFFFFFFD  Secure stack      Thread mode   PSP         Basic
+        0xFFFFFFA1  Non-secure stack  Handler mode. MSP         Extended
+        0xFFFFFFA9  Non-Secure stack  Thread mode   MSP         Extended
+        0xFFFFFFAD  Non-Secure stack  Thread mode   PSP         Extended
+        0xFFFFFFB1  Non-Secure stack  Handler mode. MSP         Basic
+        0xFFFFFFB9  Non-Secure stack  Thread mode   MSP         Basic
+        0xFFFFFFBD  Non-Secure stack  Thread mode   PSP         Basic
 
-        So LR[2] == 1 => Return stack == PSP else MSP
+        Bit    Value 1                    Value 0
+        ----------------------------------------------------------------
+        LR[6]  Secure stack               Non-secure stack
+        LR[5]  Additional Stack saved     Additional Stack skipped
+        LR[4]  Standard frame             Extended frame
+        LR[3]  Thread mode                Handler mode
+        LR[2]  PSP return stack           MSP return stack
+        LR[1]  Always zero                Always zero
+        LR[0]  Exception secure           Exception non-secure
 
         R0-R3, R12, PC, xPSR can be written via application stackpointer
         Other regs can be written directly
 
-
         Read register data from J-Link into R0
         */
-        LDR      R0,[R3, #+_SYSTEM_DEMCR_OFF]              // _SYSTEM_DEMCR |= (1uL << 19);  => Monitor is ready to receive register data
+        LDR      R0,[R3, #+_SYSTEM_DEMCR_OFF]          // _SYSTEM_DEMCR |= (1uL << 19);  => Monitor is ready to receive register data
         ORR      R0,R0,#0x80000
         STR      R0,[R3, #+_SYSTEM_DEMCR_OFF]
 _HandleWRegWaitUntilDataRecv:
         LDR      R0,[R3, #+_SYSTEM_DEMCR_OFF]
         LSLS     R0,R0,#+12
-        BMI.N    _HandleWRegWaitUntilDataRecv              // DEMCR[19] == 0 => J-Link has placed new data for us
-        LDR      R0,[R3, #+_SYSTEM_DCRDR_OFF]              // Get register data
-        //
-        // Determine application SP
-        //
-        LSRS     R2,LR,#+3                         // Shift LR[2] into carry => Carry clear means that CPU was running on MSP
-        ITE      CS
-        MRSCS    R2,PSP
-        MRSCC    R2,MSP
-        CMP      R1,#+4                            // if (RegIndex < 4) { (R0-R3)
+        BMI.N    _HandleWRegWaitUntilDataRecv          // DEMCR[19] == 0 => J-Link has placed new data for us
+        LDR      R0,[R3, #+_SYSTEM_DCRDR_OFF]          // Get register data
+#if _IS_ARM_V8M
+        TST      LR,#+32                               // Test if LR[5] is set => Zero means that CPU has saved additional stack state
+        IT       EQ
+        ADDEQ    R2,R2,#+_NUM_BYTES_ADD_STATE_CONTEXT  // Additional state context is saved, skip them on stack
+#endif
+_HandleWriteRegR0_3:
+        CMP      R1,#+4                                // if (RegIndex < 4) { (R0-R3)
         BCS      _HandleWriteRegR4
-        STR      R0,[R2, R1, LSL #+2]              // v = [SP + Rx * 4] (R0-R3)
+        STR      R0,[R2, R1, LSL #+2]                  // v = [SP + R1 * 4] (R0-R3)
         B.N      _HandleWriteRegDone
 _HandleWriteRegR4:
-        CMP      R1,#+5                          // if (RegIndex < 5) { (R4)
+        CMP      R1,#+5                                // if (RegIndex < 5) { (R4)
         BCS      _HandleWriteRegR5
         MOV      R4,R0
         B.N      _HandleWriteRegDone
 _HandleWriteRegR5:
-        CMP      R1,#+6                          // if (RegIndex < 6) { (R5)
+        CMP      R1,#+6                                // if (RegIndex < 6) { (R5)
         BCS      _HandleWriteRegR6
         MOV      R5,R0
         B.N      _HandleWriteRegDone
 _HandleWriteRegR6:
-        CMP      R1,#+7                          // if (RegIndex < 7) { (R6)
+        CMP      R1,#+7                                // if (RegIndex < 7) { (R6)
         BCS      _HandleWriteRegR7
         MOV      R6,R0
         B.N      _HandleWriteRegDone
 _HandleWriteRegR7:
-        CMP      R1,#+8                          // if (RegIndex < 8) { (R7)
+        CMP      R1,#+8                                // if (RegIndex < 8) { (R7)
         BCS      _HandleWriteRegR8
         MOV      R7,R0
         B.N      _HandleWriteRegDone
 _HandleWriteRegR8:
-        CMP      R1,#+9                          // if (RegIndex < 9) { (R8)
+        CMP      R1,#+9                                // if (RegIndex < 9) { (R8)
         BCS      _HandleWriteRegR9
         MOV      R8,R0
         B.N      _HandleWriteRegDone
 _HandleWriteRegR9:
-        CMP      R1,#+10                         // if (RegIndex < 10) { (R9)
+        CMP      R1,#+10                               // if (RegIndex < 10) { (R9)
         BCS      _HandleWriteRegR10
         MOV      R9,R0
         B.N      _HandleWriteRegDone
 _HandleWriteRegR10:
-        CMP      R1,#+11                         // if (RegIndex < 11) { (R10)
+        CMP      R1,#+11                               // if (RegIndex < 11) { (R10)
         BCS      _HandleWriteRegR11
         MOV      R10,R0
         B.N      _HandleWriteRegDone
 _HandleWriteRegR11:
-        CMP      R1,#+12                         // if (RegIndex < 12) { (R11)
+        CMP      R1,#+12                               // if (RegIndex < 12) { (R11)
         BCS      _HandleWriteRegR12
         MOV      R11,R0
         B.N      _HandleWriteRegDone
 _HandleWriteRegR12:
-        CMP      R1,#+14                         // if (RegIndex < 14) { (R12)
+        CMP      R1,#+14                               // if (RegIndex < 14) { (R12)
         BCS      _HandleWriteRegR14
-        STR      R0,[R2, #+_APP_SP_OFF_R12]
+        STR      R0,[R2 ,#+_APP_SP_OFF_R12]
         B.N      _HandleWriteRegDone
 _HandleWriteRegR14:
-        CMP      R1,#+15                         // if (RegIndex < 15) { (R14 / LR)
+        CMP      R1,#+15                               // if (RegIndex < 15) { (R14 / LR)
         BCS      _HandleWriteRegR15
         STR      R0,[R2, #+_APP_SP_OFF_R14_LR]
         B.N      _HandleWriteRegDone
 _HandleWriteRegR15:
-        CMP      R1,#+16                         // if (RegIndex < 16) { (R15 / PC)
+        CMP      R1,#+16                               // if (RegIndex < 16) { (R15 / PC)
         BCS      _HandleWriteRegXPSR
         STR      R0,[R2, #+_APP_SP_OFF_PC]
         B.N      _HandleWriteRegDone
 _HandleWriteRegXPSR:
-        CMP      R1,#+17                         // if (RegIndex < 17) { (xPSR)
+        CMP      R1,#+17                               // if (RegIndex < 17) { (xPSR)
         BCS      _HandleWriteRegMSP
         STR      R0,[R2, #+_APP_SP_OFF_XPSR]
         B.N      _HandleWriteRegDone
@@ -753,11 +943,11 @@ _HandleWriteRegMSP:
         //
         // For now, SP cannot be modified because it is needed to jump back from monitor mode
         //
-        CMP      R1,#+18                            // if (RegIndex < 18) { (MSP)
+        CMP      R1,#+18                               // if (RegIndex < 18) { (MSP)
         BCS      _HandleWriteRegPSP
         B.N      _HandleWriteRegDone
-_HandleWriteRegPSP:                                 // RegIndex == 18
-        CMP      R1,#+19                            // if (RegIndex < 19) {
+_HandleWriteRegPSP:                                    // RegIndex == 18
+        CMP      R1,#+19                               // if (RegIndex < 19) {
         BCS      _HandleWriteRegCFBP
         B.N      _HandleWriteRegDone
 _HandleWriteRegCFBP:
@@ -766,46 +956,51 @@ _HandleWriteRegCFBP:
         CONTROL/FAULTMASK/BASEPRI/PRIMASK (packed into 4 bytes of word. CONTROL = CFBP[31:24], FAULTMASK = CFBP[16:23], BASEPRI = CFBP[15:8], PRIMASK = CFBP[7:0]
         To keep J-Link side the same for monitor and halt mode, we also return CFBP in monitor mode
         */
-        CMP      R1,#+20                                // if (RegIndex < 20) { (CFBP)
+        CMP      R1,#+20                               // if (RegIndex < 20) { (CFBP)
         BCS      _HandleWriteRegFPU
+_WriteRegCFBP:
         LSLS     R1,R0,#+24
-        LSRS     R1,R1,#+24                             // Extract CFBP[7:0] => PRIMASK
+        LSRS     R1,R1,#+24                            // Extract CFBP[7:0] => PRIMASK
         MSR      PRIMASK,R1
         LSLS     R1,R0,#+16
-        LSRS     R1,R1,#+24                             // Extract CFBP[15:8] => BASEPRI
+        LSRS     R1,R1,#+24                            // Extract CFBP[15:8] => BASEPRI
         MSR      BASEPRI,R1
-        LSLS     R1,R0,#+8                              // Extract CFBP[23:16] => FAULTMASK
+        LSLS     R1,R0,#+8                             // Extract CFBP[23:16] => FAULTMASK
         LSRS     R1,R1,#+24
         MSR      FAULTMASK,R1
-        LSRS     R1,R0,#+24                             // Extract CFBP[31:24] => CONTROL
-        LSRS     R0,R1,#2                               // Current CONTROL[1] -> Carry
-        ITE      CS                                     // Update saved CONTROL.SPSEL (CONTROL[1]). CONTROL.SPSEL is saved to LR[2] on exception entry => ARM DDI0403D, B1.5.6 Exception entry behavior
+        LSRS     R1,R0,#+24                            // Extract CFBP[31:24] => CONTROL
+        //
+        // These bits are controlled via the EXT_RETURN LR payload:
+        // => CONTROL.SPSEL[1] and CONTROL.FPCA[2]
+        //
+        LSRS     R0,R1,#2                              // Current CONTROL[1] -> Carry
+        ITE      CS                                    // Update saved CONTROL.SPSEL (CONTROL[1]). CONTROL.SPSEL is saved to LR[2] on exception entry => ARM DDI0403D, B1.5.6 Exception entry behavior
         ORRCS    LR,LR,#+4
         BICCC    LR,LR,#+4
-        BIC      R1,R1,#+2                              // CONTROL.SPSEL (CONTROL[1]) == 0 inside monitor. Otherwise behavior is UNPREDICTABLE
-        LSRS     R0,R1,#+3                              // New CONTROL.FPCA (CONTROL[2]) -> Carry
-        ITE      CS                                     // CONTROL[2] == FPCA => NOT(FPCA) saved to LR[4]. LR[4] == 0 => Extended stack frame, so FPU regs possibly on stack
-        BICCS    LR,LR,#+0x10                           // Remember: NOT(FPCA) is stored to LR. == 0 means: Extended stack frame
+        BIC      R1,R1,#+2                             // CONTROL.SPSEL (CONTROL[1]) == 0 inside monitor. Otherwise behavior is UNPREDICTABLE
+        LSRS     R0,R1,#+3                             // New CONTROL.FPCA (CONTROL[2]) -> Carry
+        ITE      CS                                    // CONTROL[2] == FPCA => NOT(FPCA) saved to LR[4]. LR[4] == 0 => Extended stack frame, so FPU regs possibly on stack
+        BICCS    LR,LR,#+0x10                          // Remember: NOT(FPCA) is stored to LR. == 0 means: Extended stack frame
         ORRCC    LR,LR,#+0x10
         MRS      R0,CONTROL
-        LSRS     R0,R0,#+3                              // CONTROL[2] -> Carry
-        ITE      CS                                     // Preserve original value of current CONTROL[2]
+        LSRS     R0,R0,#+3                             // CONTROL[2] -> Carry
+        ITE      CS                                    // Preserve original value of current CONTROL[2]
         ORRCS    R1,R1,#+0x04
         BICCC    R1,R1,#+0x04
         MSR      CONTROL,R1
-        ISB                                             // Necessary after writing to CONTROL, see ARM DDI0403D, B1.4.4 The special-purpose CONTROL register
+        ISB                                            // Necessary after writing to CONTROL, see ARM DDI0403D, B1.4.4 The special-purpose CONTROL register
         B.N      _HandleWriteRegDone
 _HandleWriteRegFPU:
+        CMP      R1,#+53                               // if (RegIndex < 53) { (20 (FPSCR), 21-52 FPS0-FPS31)
+        BCS      _HandleWriteRegsARMv8
 #if _HAS_FPU_REGS
-        CMP      R1,#+53                                // if (RegIndex < 53) { (20 (FPSCR), 21-52 FPS0-FPS31)
-        BCS      _HandleWriteRegDone_Veneer
         /*
         Read Coprocessor Access Control Register (CPACR) to check if CP10 and CP11 are enabled
         If not, access to floating point is not possible
         CPACR[21:20] == CP10 enable. 0b01 = Privileged access only. 0b11 = Full access. Other = reserved
         CPACR[23:22] == CP11 enable. 0b01 = Privileged access only. 0b11 = Full access. Other = reserved
         */
-        MOV      R12,R0                                  // Save register data
+        MOV      R12,R0                                // Save register data
         LDR      R0,_AddrCPACR
         LDR      R0,[R0]
         LSLS     R0,R0,#+8
@@ -815,44 +1010,44 @@ _HandleWriteRegFPU:
         CMP      R0,#+0x5
         BNE      _HandleWriteRegDone_Veneer
 _HandleWriteRegFPU_Allowed:
-        CMP      R1,#+21                                  // if (RegIndex < 21) (20 == FPSCR)
+        CMP      R1,#+21                               // if (RegIndex < 21) (20 == FPSCR)
         BCS      _HandleWriteRegFPS0_FPS31
-        LSRS     R0,LR,#+5                                // CONTROL[2] == FPCA => NOT(FPCA) saved to LR[4]. LR[4] == 0 => Extended stack frame, so FPU regs possibly on stack
-        BCS      _HandleWriteFPSCRLazyMode                // Remember: NOT(FPCA) is stored to LR. == 0 means: Extended stack frame
+        LSRS     R0,LR,#+5                             // CONTROL[2] == FPCA => NOT(FPCA) saved to LR[4]. LR[4] == 0 => Extended stack frame, so FPU regs possibly on stack
+        BCS      _HandleWriteFPSCRLazyMode             // Remember: NOT(FPCA) is stored to LR. == 0 means: Extended stack frame
         LDR      R0,=_SYSTEM_FPCCR
         LDR      R0,[R0]
-        LSLS     R0,R0,#+2                                // FPCCR[30] -> Carry == 1 indicates if lazy mode is active, so space on stack is reserved but FPU registers are not saved on stack
+        LSLS     R0,R0,#+2                             // FPCCR[30] -> Carry == 1 indicates if lazy mode is active, so space on stack is reserved but FPU registers are not saved on stack
         BCS      _HandleWriteFPSCRLazyMode
         STR      R12,[R2, #+_APP_SP_OFF_FPSCR]
         B        _HandleWriteRegDone
 _HandleWriteFPSCRLazyMode:
         VMSR     FPSCR,R12
         B        _HandleWriteRegDone
-_HandleWriteRegFPS0_FPS31:                                // RegIndex == 21-52
+_HandleWriteRegFPS0_FPS31:                             // RegIndex == 21-52
         LDR      R0,=_SYSTEM_FPCCR
         LDR      R0,[R0]
-        LSLS     R0,R0,#+2                                // FPCCR[30] -> Carry == 1 indicates if lazy mode is active, so space on stack is reserved but FPU registers are not saved on stack
+        LSLS     R0,R0,#+2                             // FPCCR[30] -> Carry == 1 indicates if lazy mode is active, so space on stack is reserved but FPU registers are not saved on stack
         BCS      _HandleWriteFPS0_FPS31LazyMode
-        LSRS     R0,LR,#+5                                // CONTROL[2] == FPCA => NOT(FPCA) saved to LR[4]. LR[4] == 0 => Extended stack frame, so FPU regs possibly on stack
-        BCS     _HandleWriteFPS0_FPS31LazyMode            // Remember: NOT(FPCA) is stored to LR. == 0 means: Extended stack frame
-        SUBS     R1,#+21                                  // Convert absolute reg index into rel. one
-        LSLS     R1,R1,#+2                                // RegIndex to position on stack
+        LSRS     R0,LR,#+5                             // CONTROL[2] == FPCA => NOT(FPCA) saved to LR[4]. LR[4] == 0 => Extended stack frame, so FPU regs possibly on stack
+        BCS     _HandleWriteFPS0_FPS31LazyMode         // Remember: NOT(FPCA) is stored to LR. == 0 means: Extended stack frame
+        SUBS     R1,#+21                               // Convert absolute reg index into rel. one
+        LSLS     R1,R1,#+2                             // RegIndex to position on stack
         ADDS     R1,#+_APP_SP_OFF_S0
         STR      R12,[R2, R1]
 _HandleWriteRegDone_Veneer:
         B        _HandleWriteRegDone
 _HandleWriteFPS0_FPS31LazyMode:
-        SUBS     R1,#+20                                  // Convert abs. RegIndex into rel. one
+        SUBS     R1,#+20                               // Convert abs. RegIndex into rel. one
         MOVS     R0,#+6
         MULS     R1,R0,R1
-        LDR      R0,=_HandleReadRegUnknown
-        SUB      R0,R0,R1                                 // _HandleReadRegUnknown - 6 * ((RegIndex - 21) + 1)
-        ORR      R0,R0,#1                                 // Thumb bit needs to be set in DestAddr
+        LDR      R0,=_FPUJumpTableWriteEnd
+        SUB      R0,R0,R1                              // _HandleReadRegUnknown - 6 * ((RegIndex - 21) + 1)
+        ORR      R0,R0,#1                              // Thumb bit needs to be set in DestAddr
         BX       R0
         //
         // Table for reading FPS0-FPS31
         //
-        VMOV     S31,R12                                  // v = FPSx
+        VMOV     S31,R12                               // v = FPSx
         B        _HandleWriteRegDone
         VMOV     S30,R12
         B        _HandleWriteRegDone
@@ -916,6 +1111,91 @@ _HandleWriteFPS0_FPS31LazyMode:
         B        _HandleWriteRegDone
         VMOV     S0,R12
         B        _HandleWriteRegDone
+_FPUJumpTableWriteEnd:
+#else
+        B        _HandleWriteRegUnknown
+#endif
+_HandleWriteRegsARMv8:
+#if _IS_ARM_V8M
+//
+// For now, SP cannot be modified because it is needed to jump back from monitor mode
+//
+_HandleWriteRegMSP_NS:
+        CMP      R1,#+65                               // if (RegIndex < 65) { (MSP_NS)
+        BCS      _HandleWriteRegPSP_NS
+        B.N      _HandleWriteRegDone
+_HandleWriteRegPSP_NS:
+        CMP      R1,#+66                               // if (RegIndex < 66) { (PSP_NS)
+        BCS      _HandleWriteRegMSP_S
+        B.N      _HandleWriteRegDone
+_HandleWriteRegMSP_S:
+        CMP      R1,#+67                               // if (RegIndex < 67) { (MSP_S)
+        BCS      _HandleWriteRegPSP_S
+        B.N      _HandleWriteRegDone
+_HandleWriteRegPSP_S:
+        CMP      R1,#+68                               // if (RegIndex < 68) { (PSP_S)
+        BCS      _HandleWriteRegMSPLIM_S
+        B.N      _HandleWriteRegDone
+_HandleWriteRegMSPLIM_S:
+        CMP      R1,#+69                               // if (RegIndex < 69) { (MSPLIM_S)
+        BCS      _HandleWriteRegPSPLIM_S
+        MSR      MSPLIM,R0
+        B.N      _HandleWriteRegDone
+_HandleWriteRegPSPLIM_S:
+        CMP      R1,#+70                               // if (RegIndex < 70) { (PSPLIM_S)
+        BCS      _HandleWriteRegMSPLIM_NS
+        MSR      PSPLIM,R0
+        B.N      _HandleWriteRegDone
+_HandleWriteRegMSPLIM_NS:
+        CMP      R1,#+71                               // if (RegIndex < 71) { (MSPLIM_NS)
+        BCS      _HandleWriteRegPSPLIM_NS
+        MSR      MSPLIM_NS,R0
+        B.N      _HandleWriteRegDone
+_HandleWriteRegPSPLIM_NS:
+        CMP      R1,#+72                               // if (RegIndex < 72) { (PSPLIM_NS)
+        BCS      _HandleWriteRegCFBP_S
+        MSR      PSPLIM_NS,R0
+        B.N      _HandleWriteRegDone
+_HandleWriteRegCFBP_S:
+        CMP      R1,#+75                               // if (RegIndex < 75) { (CFBP_S)
+        BCS      _HandleWriteRegCFBP_NS
+        BCC      _WriteRegCFBP                         // Point to secure/default variant
+_HandleWriteRegCFBP_NS:
+        /*
+        CFBP is a register that can only be read via debug probe and is a merger of the following regs:
+        CONTROL/FAULTMASK/BASEPRI/PRIMASK (packed into 4 bytes of word. CONTROL = CFBP[31:24], FAULTMASK = CFBP[16:23], BASEPRI = CFBP[15:8], PRIMASK = CFBP[7:0]
+        To keep J-Link side the same for monitor and halt mode, we also return CFBP in monitor mode
+        */
+        CMP      R1,#+76                               // if (RegIndex < 76) { (CFBP_NS)
+        BCS      _HandleWriteRegUnknown
+        LSLS     R1,R0,#+24
+        LSRS     R1,R1,#+24                            // Extract CFBP[7:0] => PRIMASK
+        MSR      PRIMASK_NS,R1
+        LSLS     R1,R0,#+16
+        LSRS     R1,R1,#+24                            // Extract CFBP[15:8] => BASEPRI
+        MSR      BASEPRI_NS,R1
+        LSLS     R1,R0,#+8                             // Extract CFBP[23:16] => FAULTMASK
+        LSRS     R1,R1,#+24
+        MSR      FAULTMASK_NS,R1
+        LSRS     R1,R0,#+24                            // Extract CFBP[31:24] => CONTROL
+        //
+        // These bits are controlled via the EXT_RETURN LR payload:
+        // => CONTROL.SPSEL[1] and CONTROL.FPCA[2]
+        //
+        LSRS     R0,LR,#+7                             // Shift LR[6] into carry
+        BCS      _SkipLRMod                            // Carry set means CPU was in secure mode => we do not need to modify LR
+        LSRS     R0,R1,#+2                             // Current CONTROL[1] -> Carry
+        ITE      CS                                    // Update saved CONTROL.SPSEL (CONTROL[1]). CONTROL.SPSEL is saved to LR[2] on exception entry => ARM DDI0403D, B1.5.6 Exception entry behavior
+        ORRCS    LR,LR,#+4
+        BICCC    LR,LR,#+4
+        LSRS     R0,R1,#+3                             // New CONTROL.FPCA (CONTROL[2]) -> Carry
+        ITE      CS                                    // CONTROL[2] == FPCA => NOT(FPCA) saved to LR[4]. LR[4] == 0 => Extended stack frame, so FPU regs possibly on stack
+        BICCS    LR,LR,#+0x10                          // Remember: NOT(FPCA) is stored to LR. == 0 means: Extended stack frame
+        ORRCC    LR,LR,#+0x10
+_SkipLRMod:
+        MSR      CONTROL_NS,R1
+        ISB                                            // Necessary after writing to CONTROL, see ARM DDI0403D, B1.4.4 The special-purpose CONTROL register
+        B.N      _HandleWriteRegDone
 #else
         B        _HandleWriteRegUnknown
 #endif
@@ -923,5 +1203,46 @@ _HandleWriteRegUnknown:
         B.N      _HandleWriteRegDone
 _HandleWriteRegDone:
         B        _IndicateMonReady                     // Indicate that monitor has read data, processed command and is ready for a new one
+
+/*********************************************************************
+*
+*       _HandleSPCorrection()
+*
+*  Function description
+*    This function calculates the offset for the original SP, before
+*    context registers were stacked on exception entry.
+*
+*  Parameters
+*   R0: Input. SP that needs to be corrected.
+*   R1: Input. Original LR with EXC_RETURN payload.
+*   R2: Input. Selected SP that contains the XPSR.
+*
+*  Return value
+*   R0: Corrected SP before exception was entered.
+*
+*  Notes
+*   (1) This does not consider the Additional Floating point context
+*       because exception is always called into Secure domain.
+*   (2) R12 is used as temporary variable
+*/
+_HandleSPCorrection:
+        //
+        // Stack Pointer Alignment
+        //
+        LDR      R12,[R2,#+_APP_SP_OFF_XPSR]
+        LSRS     R12,R12,#+10                          // xPSR[9] -> Carry == 1 => Stack has been force-aligned before pushing regs. See ARM DDI0403D, B1.5.7 Stack alignment on exception entry
+        IT       CS
+        ADDCS    R0,R0,#+4
+        //
+        // Extended or standard frame
+        //
+        LSRS     R12,R1,#+5                            // LR[4] -> Carry == 0 => extended stack frame has been allocated. See ARM DDI0403D, B1.5.7 Stack alignment on exception entry
+        ITE      CS
+        ADDCS    R0,R0,#+_NUM_BYTES_BASIC_STACKFRAME
+        ADDCC    R0,R0,#+_NUM_BYTES_EXTENDED_STACKFRAME
+        //
+        // Output
+        //
+        B        _HandleReadRegDone                    // Jump always back to _HandleReadRegDone
         .end
 /****** End Of File *************************************************/

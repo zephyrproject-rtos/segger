@@ -1,9 +1,10 @@
 /*********************************************************************
-*                    SEGGER Microcontroller GmbH                     *
+*                   (c) SEGGER Microcontroller GmbH                  *
 *                        The Embedded Experts                        *
+*                           www.segger.com                           *
 **********************************************************************
 *                                                                    *
-*            (c) 1995 - 2018 SEGGER Microcontroller GmbH             *
+*            (c) 1995 - 2025 SEGGER Microcontroller GmbH             *
 *                                                                    *
 *       www.segger.com     Support: support@segger.com               *
 *                                                                    *
@@ -56,6 +57,12 @@ Purpose : Header file of debug monitor for J-Link monitor mode debug on Cortex-M
 #ifndef JLINK_MONITOR_H
 #define JLINK_MONITOR_H
 
+/*********************************************************************
+*
+*       API functions
+*
+**********************************************************************
+*/
 void JLINK_MONITOR_OnExit  (void);
 void JLINK_MONITOR_OnEnter (void);
 void JLINK_MONITOR_OnPoll  (void);

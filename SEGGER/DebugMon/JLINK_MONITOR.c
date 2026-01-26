@@ -1,9 +1,10 @@
 /*********************************************************************
-*                    SEGGER Microcontroller GmbH                     *
+*                   (c) SEGGER Microcontroller GmbH                  *
 *                        The Embedded Experts                        *
+*                           www.segger.com                           *
 **********************************************************************
 *                                                                    *
-*            (c) 1995 - 2018 SEGGER Microcontroller GmbH             *
+*            (c) 1995 - 2025 SEGGER Microcontroller GmbH             *
 *                                                                    *
 *       www.segger.com     Support: support@segger.com               *
 *                                                                    *
@@ -57,41 +58,6 @@ Purpose : Implementation of debug monitor for J-Link monitor mode debug on Corte
 
 /*********************************************************************
 *
-*       Configuration
-*
-**********************************************************************
-*/
-
-/*********************************************************************
-*
-*       Defines
-*
-**********************************************************************
-*/
-
-/*********************************************************************
-*
-*       Types
-*
-**********************************************************************
-*/
-
-/*********************************************************************
-*
-*       Static data
-*
-**********************************************************************
-*/
-
-/*********************************************************************
-*
-*       Local functions
-*
-**********************************************************************
-*/
-
-/*********************************************************************
-*
 *       Global functions
 *
 **********************************************************************
@@ -110,9 +76,8 @@ Purpose : Implementation of debug monitor for J-Link monitor mode debug on Corte
 */
 void JLINK_MONITOR_OnExit(void) {
   //
-  // Add custom code here
+  // Add user-specific code here
   //
-//  BSP_ClrLED(0);
 }
 
 /*********************************************************************
@@ -128,10 +93,8 @@ void JLINK_MONITOR_OnExit(void) {
 */
 void JLINK_MONITOR_OnEnter(void) {
   //
-  // Add custom code here
+  // Add user-specific code here
   //
-//  BSP_SetLED(0);
-//  BSP_ClrLED(1);
 }
 
 /*********************************************************************
@@ -146,10 +109,8 @@ void JLINK_MONITOR_OnEnter(void) {
 */
 void JLINK_MONITOR_OnPoll(void) {
   //
-  // Add custom code here
+  // Add user-specific code here
   //
-//  BSP_ToggleLED(0);
-//  _Delay(500000);
 }
 
 /****** End Of File *************************************************/

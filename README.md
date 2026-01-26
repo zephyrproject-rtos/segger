@@ -63,5 +63,5 @@ Segger source files with Zephyr specific changes:
 [6]: https://github.com/SEGGERMicro
 [7]: https://www.segger.com/downloads/jlink/systemview_target_src
 [8]: https://www.segger.com/downloads/systemview
-[9]: https://www.segger.com/downloads/pub/Generic_Cortex-M_MonitorModeSystickExample_SES.zip
-[10]: https://www.segger.com/products/debug-probes/j-link/technology/monitor-mode-debugging
+[9]: https://kb.segger.com/File:MonitorMode_ProjectFiles_SES.zip
+[10]: https://kb.segger.com/Monitor_Mode_Debugging
