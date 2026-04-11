@@ -41,10 +41,6 @@
 * DAMAGE.                                                            *
 *                                                                    *
 **********************************************************************
-*                                                                    *
-*       SystemView version: 3.58                                    *
-*                                                                    *
-**********************************************************************
 -------------------------- END-OF-HEADER -----------------------------
 File    : SEGGER_SYSVIEW.h
 Purpose : System visualization API.
@@ -135,6 +131,7 @@ extern "C" {
 #define   SYSVIEW_EVTID_EX_HEAP_ALLOC_EX  4
 #define   SYSVIEW_EVTID_EX_HEAP_FREE      5
 #define   SYSVIEW_EVTID_EX_REGISTER_DATA  6
+#define   SYSVIEW_EVTID_EX_PRINT_ELF      7
 //
 // Event masks to disable/enable events
 //
@@ -232,6 +229,22 @@ typedef struct {
   const char*                   sUnit;
 }  SEGGER_SYSVIEW_DATA_REGISTER;
 
+typedef struct {
+  U8                      EnableState;   // 0: Disabled, 1: Enabled, (2: Dropping)
+  U8                      UpChannel;
+  U8                      RecursionCnt;
+  U32                     SysFreq;
+  U32                     CPUFreq;
+  U32                     LastTxTimeStamp;
+  U32                     RAMBaseAddress;
+#if (SEGGER_SYSVIEW_POST_MORTEM_MODE == 1)
+  U32                     PacketCount;
+#else
+  U32                     DropCount;
+  U8                      DownChannel;
+#endif
+} SEGGER_SYSVIEW_CORE_CONTEXT;
+
 typedef struct SEGGER_SYSVIEW_MODULE_STRUCT SEGGER_SYSVIEW_MODULE;
 
 struct SEGGER_SYSVIEW_MODULE_STRUCT {
@@ -243,6 +256,8 @@ struct SEGGER_SYSVIEW_MODULE_STRUCT {
 };
 
 typedef void (SEGGER_SYSVIEW_SEND_SYS_DESC_FUNC)(void);
+typedef void (SEGGER_SYSVIEW_START_CALLBACK)(void);
+typedef void (SEGGER_SYSVIEW_STOP_CALLBACK)(void);
 
 
 /*********************************************************************
@@ -284,9 +299,13 @@ typedef struct {
 *       Control and initialization functions
 */
 void SEGGER_SYSVIEW_Init                          (U32 SysFreq, U32 CPUFreq, const SEGGER_SYSVIEW_OS_API *pOSAPI, SEGGER_SYSVIEW_SEND_SYS_DESC_FUNC pfSendSysDesc);
+void SEGGER_SYSVIEW_Init_Ex                       (U32 SysFreq, U32 CPUFreq, const SEGGER_SYSVIEW_OS_API *pOSAPI, SEGGER_SYSVIEW_SEND_SYS_DESC_FUNC pfSendSysDesc, SEGGER_SYSVIEW_START_CALLBACK pfStartCallback, SEGGER_SYSVIEW_STOP_CALLBACK pfEndCallback);
+void SEGGER_SYSVIEW_InitAdditionalBuffer          (SEGGER_SYSVIEW_CORE_CONTEXT* pContext, void* pUpBuffer, unsigned UpBufferSize, void* pDownBuffer, unsigned DownBufferSize);
 void SEGGER_SYSVIEW_SetRAMBase                    (U32 RAMBaseAddress);
 void SEGGER_SYSVIEW_Start                         (void);
+void SEGGER_SYSVIEW_Start_Ex                      (SEGGER_SYSVIEW_CORE_CONTEXT* pContext, unsigned Timestamp);
 void SEGGER_SYSVIEW_Stop                          (void);
+void SEGGER_SYSVIEW_Stop_Ex                       (SEGGER_SYSVIEW_CORE_CONTEXT* pContext);
 void SEGGER_SYSVIEW_GetSysDesc                    (void);
 void SEGGER_SYSVIEW_SendTaskList                  (void);
 void SEGGER_SYSVIEW_SendTaskInfo                  (const SEGGER_SYSVIEW_TASKINFO* pInfo);
@@ -296,6 +315,8 @@ int  SEGGER_SYSVIEW_IsStarted                     (void);
 int  SEGGER_SYSVIEW_GetChannelID                  (void);
 
 void  SEGGER_SYSVIEW_SampleData                   (const SEGGER_SYSVIEW_DATA_SAMPLE *pInfo);
+
+SEGGER_SYSVIEW_CORE_CONTEXT* SEGGER_SYSVIEW_GetMainContext (void);
 
 /*********************************************************************
 *
@@ -343,6 +364,7 @@ void SEGGER_SYSVIEW_NameResource                  (U32 ResourceId, const char* s
 void SEGGER_SYSVIEW_RegisterData                  ( SEGGER_SYSVIEW_DATA_REGISTER* pInfo);
 
 int  SEGGER_SYSVIEW_SendPacket                    (U8* pPacket, U8* pPayloadEnd, unsigned int EventId);
+int  SEGGER_SYSVIEW_SendPacket_Ex                 (SEGGER_SYSVIEW_CORE_CONTEXT* pContext, U32 TimeStamp, U8* pPacket, U8* pPayloadEnd);
 
 /*********************************************************************
 *
@@ -387,6 +409,87 @@ void SEGGER_SYSVIEW_VErrorfHost                   (const char* s, va_list* pPara
 void SEGGER_SYSVIEW_ErrorfTarget                  (const char* s, ...);
 void SEGGER_SYSVIEW_VErrorfTarget                 (const char* s, va_list* pParamList);
 #endif
+//
+// Convenience macros.
+//
+#define SEGGER_SYSVIEW_PLACE_IN_SECTION __attribute__((section(".sv-data")))
+
+#define SV_INT_ARGS(...) {__VA_ARGS__}
+#define SV_STR_ARGS(...) {__VA_ARGS__}
+
+#define SEGGER_SYSVIEW_PRINT_ELF(Options, sMsg) do {                                                                          \
+    static const char SEGGER_SYSVIEW_PLACE_IN_SECTION ac[] = sMsg;                                                            \
+    SEGGER_SYSVIEW__PrintElf((unsigned int)ac, Options);                                                                      \
+} while (0)
+#define SEGGER_SYSVIEW_PRINT_ELF_U32(Options, sMsg, Para0) do {                                                               \
+    static const char SEGGER_SYSVIEW_PLACE_IN_SECTION ac[] = sMsg;                                                            \
+    SEGGER_SYSVIEW__PrintElf_U32((unsigned int)ac, Options, (U32)Para0);                                                      \
+} while (0)
+#define SEGGER_SYSVIEW_PRINT_ELF_U32_X2(Options, sMsg, Para0, Para1) do {                                                     \
+    static const char SEGGER_SYSVIEW_PLACE_IN_SECTION ac[] = sMsg;                                                            \
+    SEGGER_SYSVIEW__PrintElf_U32x2((unsigned int)ac, Options, (U32)Para0, (U32)Para1);                                        \
+} while (0)
+#define SEGGER_SYSVIEW_PRINT_ELF_U32_X3(Options, sMsg,Para0, Para1, Para2) do {                                               \
+    static const char SEGGER_SYSVIEW_PLACE_IN_SECTION ac[] = sMsg;                                                            \
+    SEGGER_SYSVIEW__PrintElf_U32x3((unsigned int)ac, Options, (U32)Para0, (U32)Para1, (U32)Para2);                            \
+} while (0)
+#define SEGGER_SYSVIEW_PRINT_ELF_U32_X4(Options, sMsg, Para0, Para1, Para2, Para3) do {                                       \
+    static const char SEGGER_SYSVIEW_PLACE_IN_SECTION ac[] = sMsg;                                                            \
+    SEGGER_SYSVIEW__PrintElf_U32x4((unsigned int)ac, Options, (U32)Para0, (U32)Para1, (U32)Para2, (U32)Para3);                \
+} while (0)
+#define SEGGER_SYSVIEW_PRINT_ELF_U32_X5(Options, sMsg, Para0, Para1, Para2, Para3, Para4) do {                                \
+    static const char SEGGER_SYSVIEW_PLACE_IN_SECTION ac[] = sMsg;                                                            \
+    SEGGER_SYSVIEW__PrintElf_U32x5((unsigned int)ac, Options, (U32)Para0, (U32)Para1, (U32)Para2, (U32)Para3, (U32)Para4);    \
+} while (0)
+#define SEGGER_SYSVIEW_PRINT_ELF_U32_X6(Options, sMsg, Para0, Para1, Para2, Para3, Para4, Para5) do {                                                           \
+    static const char SEGGER_SYSVIEW_PLACE_IN_SECTION ac[] = sMsg;                                                                                              \
+    SEGGER_SYSVIEW__PrintElf_U32x6((unsigned int)ac, Options, (U32)Para0, (U32)Para1, (U32)Para2, (U32)Para3, (U32)Para4, (U32)Para5);                          \
+} while (0)
+#define SEGGER_SYSVIEW_PRINT_ELF_U32_X7(Options, sMsg, Para0, Para1, Para2, Para3, Para4, Para5, Para6) do {                                                    \
+    static const char SEGGER_SYSVIEW_PLACE_IN_SECTION ac[] = sMsg;                                                                                              \
+    SEGGER_SYSVIEW__PrintElf_U32x7((unsigned int)ac, Options, (U32)Para0, (U32)Para1, (U32)Para2, (U32)Para3, (U32)Para4, (U32)Para5, (U32)Para6,);             \
+} while (0)
+#define SEGGER_SYSVIEW_PRINT_ELF_U32_X8(Options, sMsg, Para0, Para1, Para2, Para3, Para4, Para5, Para6, Para7) do {                                             \
+    static const char SEGGER_SYSVIEW_PLACE_IN_SECTION ac[] = sMsg;                                                                                              \
+    SEGGER_SYSVIEW__PrintElf_U32x8((unsigned int)ac, Options, (U32)Para0, (U32)Para1, (U32)Para2, (U32)Para3, (U32)Para4, (U32)Para5, (U32)Para6, (U32)Para7);  \
+} while (0)
+#define SEGGER_SYSVIEW_PRINT_ELF_U32_X9(Options, sMsg, Para0, Para1, Para2, Para3, Para4, Para5, Para6, Para7, Para8) do {                                                              \
+    static const char SEGGER_SYSVIEW_PLACE_IN_SECTION ac[] = sMsg;                                                                                                                      \
+    SEGGER_SYSVIEW__PrintElf_U32x9((unsigned int)ac, Options, (U32)Para0, (U32)Para1, (U32)Para2, (U32)Para3, (U32)Para4, (U32)Para5, (U32)Para6, (U32)Para7, (U32)Para8):              \
+} while (0)
+#define SEGGER_SYSVIEW_PRINT_ELF_U32_X10(Options, sMsg, Para0, Para1, Para2, Para3, Para4, Para5, Para6, Para7, Para8, Para9) do {                                                      \
+    static const char SEGGER_SYSVIEW_PLACE_IN_SECTION ac[] = sMsg;                                                                                                                      \
+    SEGGER_SYSVIEW__PrintElf_U32x10((unsigned int)ac, Options, (U32)Para0, (U32)Para1, (U32)Para2, (U32)Para3, (U32)Para4, (U32)Para5, (U32)Para6, (U32)Para7, (U32)Para8, (U32)Para9); \
+} while (0)
+#define   SEGGER_SYSVIEW_PRINT_ELF_U32_VAR(Options, sMsg, ...) do {                                                           \
+    static const char SEGGER_SYSVIEW_PLACE_IN_SECTION ac[] = sMsg;                                                            \
+    U32 aIntArg[] = {__VA_ARGS__};                                                                                            \
+    SEGGER_SYSVIEW_PrintElf_Fmt((unsigned int)ac, Options, SEGGER_COUNTOF(aIntArg), aIntArg, 0, NULL);                        \
+} while (0)
+#define  SEGGER_SYSVIEW_PRINT_ELF_STR_VAR(Options, sMsg, ...) do {                                                            \
+    static const char SEGGER_SYSVIEW_PLACE_IN_SECTION ac[] = sMsg;                                                            \
+    const char* aStrArg[] = {__VA_ARGS__};                                                                                    \
+    SEGGER_SYSVIEW_PrintElf_Fmt((unsigned int)ac, Options, 0, NULL, SEGGER_COUNTOF(aStrArg), aStrArg);                        \
+} while (0)
+#define SEGGER_SYSVIEW_PRINT_ELF_FMT(Options, sMsg, aIntArgPara, aStrArgPara) do {                                            \
+  static const char SEGGER_SYSVIEW_PLACE_IN_SECTION ac[] = sMsg;                                                              \
+  U32 aIntArg[] = aIntArgPara;                                                                                                \
+  const char* aStrArg[] = aStrArgPara;                                                                                        \
+  SEGGER_SYSVIEW__PrintElf_Fmt((unsigned int)ac, Options, SEGGER_COUNTOF(aIntArg), aIntArg, SEGGER_COUNTOF(aStrArg), aStrArg); \
+} while (0)
+
+void SEGGER_SYSVIEW__PrintElf                     (unsigned int ID, U32 Options);
+void SEGGER_SYSVIEW__PrintElf_U32                 (unsigned int ID, U32 Options, U32 Para0);
+void SEGGER_SYSVIEW__PrintElf_U32x2               (unsigned int ID, U32 Options, U32 Para0, U32 Para1);
+void SEGGER_SYSVIEW__PrintElf_U32x3               (unsigned int ID, U32 Options, U32 Para0, U32 Para1, U32 Para2);
+void SEGGER_SYSVIEW__PrintElf_U32x4               (unsigned int ID, U32 Options, U32 Para0, U32 Para1, U32 Para2, U32 Para3);
+void SEGGER_SYSVIEW__PrintElf_U32x5               (unsigned int ID, U32 Options, U32 Para0, U32 Para1, U32 Para2, U32 Para3, U32 Para4);
+void SEGGER_SYSVIEW__PrintElf_U32x6               (unsigned int ID, U32 Options, U32 Para0, U32 Para1, U32 Para2, U32 Para3, U32 Para4, U32 Para5);
+void SEGGER_SYSVIEW__PrintElf_U32x7               (unsigned int ID, U32 Options, U32 Para0, U32 Para1, U32 Para2, U32 Para3, U32 Para4, U32 Para5, U32 Para6);
+void SEGGER_SYSVIEW__PrintElf_U32x8               (unsigned int ID, U32 Options, U32 Para0, U32 Para1, U32 Para2, U32 Para3, U32 Para4, U32 Para5, U32 Para6, U32 Para7);
+void SEGGER_SYSVIEW__PrintElf_U32x9               (unsigned int ID, U32 Options, U32 Para0, U32 Para1, U32 Para2, U32 Para3, U32 Para4, U32 Para5, U32 Para6, U32 Para7, U32 Para8);
+void SEGGER_SYSVIEW__PrintElf_U32x10              (unsigned int ID, U32 Options, U32 Para0, U32 Para1, U32 Para2, U32 Para3, U32 Para4, U32 Para5, U32 Para6, U32 Para7, U32 Para8, U32 Para9);
+void SEGGER_SYSVIEW__PrintElf_Fmt                 (unsigned int ID, U32 Options, unsigned int NumIntArgs, U32* pIntArgs, unsigned int NumStrArgs, const char** psStrArgs);
 
 void SEGGER_SYSVIEW_Print                         (const char* s);
 void SEGGER_SYSVIEW_Warn                          (const char* s);
