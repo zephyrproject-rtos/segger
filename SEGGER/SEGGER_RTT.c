@@ -1903,6 +1903,19 @@ static void SEGGER_RTT_StrongCheckInit(void) {
     }
   }
   RTT__DMB();                       // Force order of memory accesses for cores that may perform out-of-order memory accesses
+  //
+  // An intact ID only means that some program initialized a control block here, not
+  // that it had our layout. If it did not, our buffer descriptors sit at different
+  // offsets than the ones in memory, so the block cannot be reused.
+  //
+  if (DoInit == 0) {
+    if ((p->MaxNumUpBuffers   != SEGGER_RTT_MAX_NUM_UP_BUFFERS)   ||
+        (p->MaxNumDownBuffers != SEGGER_RTT_MAX_NUM_DOWN_BUFFERS) ||
+        (p->aUp[0].pBuffer    != _acUpBuffer)                     ||
+        (p->aDown[0].pBuffer  != _acDownBuffer)) {
+      DoInit = 1;
+    }
+  }
 
   if (DoInit) {
     _DoInit();
